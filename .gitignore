@@ -1,0 +1,18 @@
+*.iml
+.idea/
+.gradle/
+.kotlin/
+build/
+local.properties
+captures/
+
+# Signing material — back these up, never commit them
+keystore.properties
+keystore/
+*.jks
+*.keystore
+
+# QA recordings and emulator screenshots
+qa/
+hs_err_pid*
+replay_pid*

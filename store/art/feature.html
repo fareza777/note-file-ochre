@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: Fraunces; src: url("../../app/src/main/res/font/fraunces.ttf"); }
+  @font-face { font-family: Inter; src: url("../../app/src/main/res/font/inter.ttf"); }
+  html, body { margin: 0; width: 1024px; height: 500px; overflow: hidden; }
+  .canvas {
+    position: relative; width: 1024px; height: 500px; background: #17130F; overflow: hidden;
+  }
+  .glow {
+    position: absolute; right: -140px; top: -180px; width: 760px; height: 760px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(180,118,63,0.55) 0%, rgba(180,118,63,0.16) 45%, rgba(23,19,15,0) 70%);
+  }
+  .spark { position: absolute; right: -30px; top: 110px; }
+  .text { position: absolute; left: 74px; top: 96px; }
+  .brand { font-family: Inter; font-weight: 600; font-size: 22px; letter-spacing: 7px; color: #D89A5E; }
+  h1 { font-family: Fraunces; font-weight: 600; font-size: 76px; line-height: 1; margin: 18px 0 14px; color: #FAF5ED; letter-spacing: -1px; }
+  p { font-family: Inter; font-weight: 400; font-size: 24px; margin: 0; color: #CBBBA8; }
+  .rule { position: absolute; left: 82px; top: 360px; width: 96px; height: 3px; background: #B4763F; border-radius: 2px; }
+  .foot { position: absolute; left: 82px; top: 384px; font-family: Inter; font-size: 19px; letter-spacing: 1px; color: #8E7C68; }
+</style>
+</head>
+<body>
+  <div class="canvas">
+    <div class="glow"></div>
+    <div class="text">
+      <div class="brand">OCHRE</div>
+      <h1>A quieter place<br>for your thoughts.</h1>
+      <p>Notes, Markdown, voice and reminders — held on your device.</p>
+    </div>
+    <svg class="spark" width="280" height="280" viewBox="0 0 108 108">
+      <defs>
+        <linearGradient id="g" x1="32" y1="30" x2="80" y2="82" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#F2CE9E" />
+          <stop offset="0.55" stop-color="#D89A5E" />
+          <stop offset="1" stop-color="#B4763F" />
+        </linearGradient>
+      </defs>
+      <path fill="url(#g)" d="M54,22 C56.3,41.2 66.8,51.7 86,54 C66.8,56.3 56.3,66.8 54,86 C51.7,66.8 41.2,56.3 22,54 C41.2,51.7 51.7,41.2 54,22 Z" />
+      <circle cx="74.5" cy="71.5" r="3.5" fill="#F7EAD8" />
+    </svg>
+    <div class="rule"></div>
+    <div class="foot">LOCAL-FIRST · NO ACCOUNT · NO TRACKING</div>
+  </div>
+</body>
+</html>

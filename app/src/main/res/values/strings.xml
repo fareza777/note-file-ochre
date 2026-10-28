@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ochre</string>
+    <string name="brand_tagline">A quieter place for your thoughts.</string>
+    <string name="hello_preview">Your notes, held with care.</string>
+    <string name="start_writing">Start writing</string>
+
+    <string name="channel_reminders">Note reminders</string>
+    <string name="channel_reminders_description">Gentle nudges for notes you asked to be reminded about.</string>
+    <string name="untitled_note">Untitled note</string>
+    <string name="reminder_sealed_body">A sealed capsule is waiting for you.</string>
+    <string name="reminder_generic_body">A note is waiting for you.</string>
+    <string name="reminder_snooze">Snooze 10 min</string>
+    <string name="reminder_done">Done</string>
+    <string name="channel_backup">Backups and sync</string>
+    <string name="channel_backup_description">Silent progress for encrypted backups.</string>
+
+    <string name="widget_label">OCHRE</string>
+    <string name="widget_write">Write</string>
+    <string name="widget_description">Your Ochre notebook, on the home screen</string>
+    <string name="widget_no_notes">No notes yet</string>
+    <string name="widget_one_note">1 note held</string>
+    <string name="widget_many_notes">%1$d notes held</string>
+    <string name="quick_capture">New note</string>
+
+    <string name="shortcut_new_short">New note</string>
+    <string name="shortcut_new_long">Write a new note</string>
+    <string name="shortcut_search_short">Search</string>
+    <string name="shortcut_search_long">Search your notes</string>
+    <string name="shortcut_echo_short">Echo</string>
+    <string name="shortcut_echo_long">Rediscover older notes</string>
+</resources>

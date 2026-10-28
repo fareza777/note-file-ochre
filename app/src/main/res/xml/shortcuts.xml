@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_note"
+        android:shortcutId="new_note"
+        android:shortcutLongLabel="@string/shortcut_new_long"
+        android:shortcutShortLabel="@string/shortcut_new_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="ochre://new" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_search"
+        android:shortcutId="search"
+        android:shortcutLongLabel="@string/shortcut_search_long"
+        android:shortcutShortLabel="@string/shortcut_search_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="ochre://search" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_echo"
+        android:shortcutId="echo"
+        android:shortcutLongLabel="@string/shortcut_echo_long"
+        android:shortcutShortLabel="@string/shortcut_echo_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="ochre://echo" />
+    </shortcut>
+
+</shortcuts>
