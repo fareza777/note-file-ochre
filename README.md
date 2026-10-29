@@ -20,13 +20,15 @@ Memos source code.
 - **Markdown editor** — headings, bold/italic/strike, nested lists, checklists (tappable
   in preview), quotes, code, GFM tables, links, tags and `[[wiki links]]`; find & replace
   with match highlighting, a heading outline for quick jumps, duplicate note, and
-  autosave with character/word feedback.
+  autosave with character/word feedback. The bottom bar is grouped into three labeled
+  menus (Format, Lists, Insert) instead of a wall of icons.
 - **Smart search** — full-text search over content and titles (SQLite FTS4) plus a small
   query language: `tag:studio`, `is:pinned`, `has:image`, `has:audio`,
   `before:2026-09-01`, `after:…`, `on:…`.
-- **Attachments** — photos and voice memos (recorded in-app with a waveform preview),
-  arbitrary files through the system picker, and a full-screen image viewer with
-  pinch-zoom and share.
+- **Attachments** — photos and arbitrary files from the phone, voice memos recorded
+  in-app with a waveform preview, and finger sketches drawn on a full-screen pad
+  (colors, three pen sizes, eraser, undo, clear) that save into the note as images.
+  A full-screen viewer offers pinch-zoom and share.
 - **Threads** — wiki links resolve to notes; every note shows *Links out* and
   *Mentioned in* backlinks.
 - **Echo** — gentle resurfacing of older notes so ideas do not sink.

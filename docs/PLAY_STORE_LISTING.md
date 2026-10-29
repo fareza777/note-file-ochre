@@ -110,15 +110,15 @@ Answer exactly as follows (the app is local-first and has no developer backend):
 - Ads: **No**.
 - Expected rating: Everyone / 3+.
 
-## Release notes (version 1.0.1)
+## Release notes (version 1.0.2)
 
 ```
-This update makes writing richer and faster.
+This update makes notes more visual and the editor easier to use.
 
-Markdown preview now renders GFM tables with per-column alignment and nested bullet
-lists. The editor gains find & replace with live match highlighting, a heading outline
-for jumping through long notes, and one-tap duplicate (attachments included). Multi-select
-in the timeline can now add a tag to several notes at once.
+You can now attach photos and any file from your phone, and draw sketches right inside
+a note with a full-screen pad: pick a color and pen size, erase, undo, and the drawing
+saves as an image in the note. The editor's bottom bar has been simplified into three
+labeled menus — Format, Lists and Insert — so every tool is easy to find.
 ```
 
 ## Publishing checklist

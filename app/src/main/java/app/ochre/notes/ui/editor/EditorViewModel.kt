@@ -209,6 +209,23 @@ class EditorViewModel(
         }
     }
 
+    fun addSketch(file: File) {
+        viewModelScope.launch {
+            runCatching {
+                val existing = _state.value.uid
+                if (existing != null) {
+                    repository.attachSketch(existing, file)
+                } else {
+                    val entity = repository.stageSketch(file, draftUid)
+                    _state.update { it.copy(staged = it.staged + entity.toEditor(staged = true)) }
+                }
+            }.onFailure {
+                file.delete()
+                messages.trySend(it.message ?: "Could not add sketch")
+            }
+        }
+    }
+
     fun startRecording() {
         if (recorder.isRecording) return
         runCatching { recorder.start() }.onFailure {

@@ -361,6 +361,28 @@ class NoteRepository(
         return entity
     }
 
+    suspend fun stageSketch(file: File, draftUid: String): AttachmentEntity =
+        attachmentStore.importLocalFile(
+            source = file,
+            memoUid = draftUid,
+            kind = AttachmentKind.IMAGE,
+            mimeType = "image/png",
+            originalName = "Sketch",
+        )
+
+    suspend fun attachSketch(memoUid: String, file: File): AttachmentEntity {
+        requireNotNull(memoDao.findByUid(memoUid)) { "Memo not found" }
+        val entity = attachmentStore.importLocalFile(
+            source = file,
+            memoUid = memoUid,
+            kind = AttachmentKind.IMAGE,
+            mimeType = "image/png",
+            originalName = "Sketch",
+        )
+        attachmentDao.insert(entity)
+        return entity
+    }
+
     suspend fun removeAttachment(uid: String) {
         val entity = attachmentDao.findByUid(uid) ?: return
         attachmentDao.markDeleted(uid, System.currentTimeMillis())

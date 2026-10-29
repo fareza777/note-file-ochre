@@ -46,7 +46,9 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.LockClock
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.TextFields
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AddPhotoAlternate
+import androidx.compose.material.icons.rounded.Brush
 import androidx.compose.material.icons.rounded.CheckBox
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Code
@@ -171,6 +173,7 @@ fun EditorScreen(
     var replaceQuery by remember { mutableStateOf("") }
     var matchIndex by remember { mutableIntStateOf(0) }
     var showOutline by remember { mutableStateOf(false) }
+    var showSketch by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val findFocusRequester = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
@@ -492,6 +495,10 @@ fun EditorScreen(
                                 )
                                 EditorAction.File -> filePicker.launch(arrayOf("*/*"))
                                 EditorAction.Record -> requestRecording()
+                                EditorAction.Sketch -> {
+                                    keyboard?.hide()
+                                    showSketch = true
+                                }
                                 else -> {
                                     val result = applyToolbarAction(action, fieldValue)
                                     fieldValue = result
@@ -779,6 +786,23 @@ fun EditorScreen(
             onStop = viewModel::stopRecording,
         )
     }
+
+    if (showSketch) {
+        SketchPad(
+            onDismiss = {
+                showSketch = false
+                scope.launch {
+                    delay(80)
+                    focusRequester.requestFocus()
+                }
+            },
+            onSave = { file ->
+                showSketch = false
+                viewModel.addSketch(file)
+            },
+            onMessage = showMessage,
+        )
+    }
 }
 
 @Composable
@@ -914,11 +938,15 @@ private fun EditorTopBar(
 }
 
 private enum class EditorAction {
-    H1, H2, Bold, Italic, Strike, Bullet, Numbered, Checkbox, Quote, Code, Table, Link, Tag, Photo, File, Record,
+    H1, H2, Bold, Italic, Strike, Bullet, Numbered, Checkbox, Quote, Code, Table, Link, Tag, Photo, File, Record, Sketch,
 }
+
+private enum class EditorMenu { None, Format, Lists, Insert }
 
 @Composable
 private fun EditorToolbar(onAction: (EditorAction) -> Unit) {
+    var openMenu by remember { mutableStateOf(EditorMenu.None) }
+    val closeMenu: () -> Unit = { openMenu = EditorMenu.None }
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
@@ -926,55 +954,131 @@ private fun EditorToolbar(onAction: (EditorAction) -> Unit) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            ToolbarButton(icon = Icons.Outlined.TextFields, label = "H1") { onAction(EditorAction.H1) }
-            ToolbarButton(icon = Icons.Outlined.TextFields, label = "H2") { onAction(EditorAction.H2) }
-            ToolbarButton(icon = Icons.Rounded.FormatBold, label = "Bold") { onAction(EditorAction.Bold) }
-            ToolbarButton(icon = Icons.Rounded.FormatItalic, label = "Italic") { onAction(EditorAction.Italic) }
-            ToolbarButton(icon = Icons.Rounded.FormatStrikethrough, label = "Strike") { onAction(EditorAction.Strike) }
-            ToolbarButton(icon = Icons.Rounded.FormatListBulleted, label = "List") { onAction(EditorAction.Bullet) }
-            ToolbarButton(icon = Icons.Rounded.FormatListNumbered, label = "Numbered") { onAction(EditorAction.Numbered) }
-            ToolbarButton(icon = Icons.Rounded.CheckBox, label = "Checkbox") { onAction(EditorAction.Checkbox) }
-            ToolbarButton(icon = Icons.Rounded.FormatQuote, label = "Quote") { onAction(EditorAction.Quote) }
-            ToolbarButton(icon = Icons.Rounded.Code, label = "Code") { onAction(EditorAction.Code) }
-            ToolbarButton(icon = Icons.Rounded.TableChart, label = "Table") { onAction(EditorAction.Table) }
-            ToolbarButton(icon = Icons.Rounded.Link, label = "Link") { onAction(EditorAction.Link) }
-            ToolbarButton(icon = Icons.Rounded.Tag, label = "Tag") { onAction(EditorAction.Tag) }
-            Spacer(Modifier.width(4.dp))
-            Box(
-                Modifier
-                    .width(1.dp)
-                    .height(24.dp)
-                    .background(MaterialTheme.colorScheme.outlineVariant),
-            )
-            Spacer(Modifier.width(4.dp))
-            ToolbarButton(icon = Icons.Rounded.AddPhotoAlternate, label = "Photo") { onAction(EditorAction.Photo) }
-            ToolbarButton(icon = Icons.Rounded.Mic, label = "Voice") { onAction(EditorAction.Record) }
-            ToolbarButton(icon = Icons.Outlined.AttachFile, label = "File") { onAction(EditorAction.File) }
+            ToolbarMenuButton(
+                label = "Format",
+                leading = {
+                    Text(
+                        "Aa",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                },
+                expanded = openMenu == EditorMenu.Format,
+                onToggle = {
+                    openMenu = if (openMenu == EditorMenu.Format) EditorMenu.None else EditorMenu.Format
+                },
+                onDismiss = closeMenu,
+            ) {
+                MenuAction("Heading 1", Icons.Outlined.TextFields) { closeMenu(); onAction(EditorAction.H1) }
+                MenuAction("Heading 2", Icons.Outlined.TextFields) { closeMenu(); onAction(EditorAction.H2) }
+                MenuAction("Bold", Icons.Rounded.FormatBold) { closeMenu(); onAction(EditorAction.Bold) }
+                MenuAction("Italic", Icons.Rounded.FormatItalic) { closeMenu(); onAction(EditorAction.Italic) }
+                MenuAction("Strikethrough", Icons.Rounded.FormatStrikethrough) { closeMenu(); onAction(EditorAction.Strike) }
+                MenuAction("Quote", Icons.Rounded.FormatQuote) { closeMenu(); onAction(EditorAction.Quote) }
+                MenuAction("Code block", Icons.Rounded.Code) { closeMenu(); onAction(EditorAction.Code) }
+            }
+            ToolbarMenuButton(
+                label = "Lists",
+                leading = {
+                    Icon(
+                        Icons.Rounded.FormatListBulleted,
+                        null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(19.dp),
+                    )
+                },
+                expanded = openMenu == EditorMenu.Lists,
+                onToggle = {
+                    openMenu = if (openMenu == EditorMenu.Lists) EditorMenu.None else EditorMenu.Lists
+                },
+                onDismiss = closeMenu,
+            ) {
+                MenuAction("Bulleted list", Icons.Rounded.FormatListBulleted) { closeMenu(); onAction(EditorAction.Bullet) }
+                MenuAction("Numbered list", Icons.Rounded.FormatListNumbered) { closeMenu(); onAction(EditorAction.Numbered) }
+                MenuAction("Checklist", Icons.Rounded.CheckBox) { closeMenu(); onAction(EditorAction.Checkbox) }
+            }
+            ToolbarMenuButton(
+                label = "Insert",
+                leading = {
+                    Icon(
+                        Icons.Rounded.Add,
+                        null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(19.dp),
+                    )
+                },
+                expanded = openMenu == EditorMenu.Insert,
+                onToggle = {
+                    openMenu = if (openMenu == EditorMenu.Insert) EditorMenu.None else EditorMenu.Insert
+                },
+                onDismiss = closeMenu,
+            ) {
+                MenuAction("Photo from gallery", Icons.Rounded.AddPhotoAlternate) { closeMenu(); onAction(EditorAction.Photo) }
+                MenuAction("File from phone", Icons.Outlined.AttachFile) { closeMenu(); onAction(EditorAction.File) }
+                MenuAction("Voice note", Icons.Rounded.Mic) { closeMenu(); onAction(EditorAction.Record) }
+                MenuAction("Sketch", Icons.Rounded.Brush) { closeMenu(); onAction(EditorAction.Sketch) }
+                HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                MenuAction("Table", Icons.Rounded.TableChart) { closeMenu(); onAction(EditorAction.Table) }
+                MenuAction("Link", Icons.Rounded.Link) { closeMenu(); onAction(EditorAction.Link) }
+                MenuAction("Tag", Icons.Rounded.Tag) { closeMenu(); onAction(EditorAction.Tag) }
+            }
         }
     }
 }
 
 @Composable
-private fun ToolbarButton(icon: ImageVector, label: String, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.55f))
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (label == "H1" || label == "H2") {
-            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else {
-            Icon(icon, contentDescription = label, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(19.dp))
+private fun ToolbarMenuButton(
+    label: String,
+    leading: @Composable () -> Unit,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onDismiss: () -> Unit,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+) {
+    Box {
+        Surface(
+            onClick = onToggle,
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.55f),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                leading()
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Icon(
+                    Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+            content()
         }
     }
+}
+
+@Composable
+private fun MenuAction(label: String, icon: ImageVector, onClick: () -> Unit) {
+    DropdownMenuItem(
+        text = { Text(label) },
+        leadingIcon = {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+        },
+        onClick = onClick,
+    )
 }
 
 private fun applyToolbarAction(action: EditorAction, value: TextFieldValue): TextFieldValue {
