@@ -50,6 +50,8 @@ Memos source code.
   timeout and a locked-notes view in Recents.
 - **Widget, tile and shortcuts** — a RemoteViews notebook widget with a *Write* button, a
   `New note` tile, and static launcher shortcuts.
+- **Ad-free purchase** — remove banners and interstitials permanently with a one-time
+  Google Play purchase; an optional rewarded ad still hides ads for 24 hours.
 - **Material 3 design** — warm light theme, true dark theme, Fraunces/Inter typography,
   responsive motion, edge-to-edge layout, dynamic color disabled to keep the Ochre
   identity consistent.
@@ -65,7 +67,7 @@ Compose functions that receive a `ViewModel` created by a small factory
 app/src/main/java/app/ochre/notes/
 ├── MainActivity.kt            edge-to-edge host, deep links, splash, biometric gate
 ├── OchreApplication.kt        container creation
-├── AppContainer.kt            manual DI: db, repository, settings, backup, sync
+├── AppContainer.kt            manual DI: db, repository, settings, billing, backup, sync
 ├── data/
 │   ├── NoteRepository.kt      CRUD, FTS feed, tags, links, trash, attachments
 │   ├── local/                 Room entities/DAOs, FTS4 triggers, migrations
@@ -75,6 +77,7 @@ app/src/main/java/app/ochre/notes/
 │   ├── security/              biometric helper, encrypted preferences
 │   └── settings/              DataStore-backed user settings
 ├── domain/                    Markdown parsing, search query language, Echo planner
+├── billing/                   Play Billing client and the remove-ads purchase
 ├── notifications/             reminder scheduling, worker, notifier, actions
 ├── ui/                        Compose screens (timeline, editor, search, echo, …)
 └── widget/                    app widget provider and Quick Settings tile
@@ -139,8 +142,9 @@ upload key itself must be recoverable).
 Your notes, attachments and settings stay on the device unless you turn on encrypted sync
 or export them. Ochre shows ads through Google AdMob (Google's test ad units in this
 build), which may collect a device identifier to serve and measure them; note content is
-never sent to the ad SDK. Watching an optional rewarded ad hides banners for 24 hours.
-See [PRIVACY.md](PRIVACY.md) for the full policy and the permission list.
+never sent to the ad SDK. Watching an optional rewarded ad hides ads for 24 hours, and a
+one-time Google Play purchase removes them permanently. See [PRIVACY.md](PRIVACY.md) for
+the full policy and the permission list.
 
 ## License and attribution
 

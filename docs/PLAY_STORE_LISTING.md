@@ -14,8 +14,8 @@ Everything needed to publish the first release. Fill the two bracketed fields
 | Default language | English (US) |
 | Content rating | Everyone |
 | Ads | Yes — Google AdMob (test units in this build) |
-| In-app purchases | No |
-| Price | Decide at publish time; the APK contains no billing code |
+| In-app purchases | Yes — one-time "Remove ads" product, $4.99 |
+| Price | Free with ads; $4.99 one-time to remove ads |
 
 ## Short description (80 char max)
 
@@ -53,8 +53,9 @@ KEEP IT YOURS
 • Markdown export: a zip of .md files with front matter
 • Optional end-to-end encrypted WebDAV sync to a server you choose
 • App lock with biometrics or your device PIN
-• Small banner ads keep Ochre free, and a rewarded ad hides banners for 24 hours
-• Your notes stay on-device; only ads and optional sync use the network
+• Small banner ads keep Ochre free; remove them permanently with a $4.99 one-time purchase,
+  or watch a rewarded ad to hide them for 24 hours
+• Your notes stay on-device; only ads, the purchase and optional sync use the network
 
 DESIGNED TO FEEL CALM
 • Material 3 with a warm ochre palette, Fraunces and Inter typography
@@ -99,8 +100,11 @@ for advertising; answer the form from Google's current AdMob data-safety guidanc
   the app before upload.
 - Data deletion: users delete notes in the app or uninstall it; the advertising ID can be
   reset or deleted in Android Settings.
-- Data collection is not required to use the app, but ads are shown unless a rewarded ad
-  grants 24 hours without banners.
+- Data collection is not required to use the app, but ads are shown unless you buy Remove
+  ads or watch a rewarded ad for 24 hours without banners.
+- In-app purchase: payments are processed by Google Play. Ochre receives only the product
+  ID and purchase token to verify entitlement and stores a local yes/no flag; it never
+  receives payment details or billing address.
 
 ## App access
 
@@ -115,6 +119,16 @@ for advertising; answer the form from Google's current AdMob data-safety guidanc
   locations the user picks, and there is no social surface.
 - Ads: **Yes**.
 - Expected rating: Everyone / 3+.
+
+## Release notes (version 1.0.5)
+
+```
+You can now remove ads for good.
+
+A single $4.99 purchase turns off the banner and interstitial permanently, and the app
+remembers it across reinstalls through your Google Play account. The free rewarded option
+still hides ads for 24 hours. Notes stay on your device as always.
+```
 
 ## Release notes (version 1.0.4)
 
@@ -157,16 +171,22 @@ labeled menus — Format, Lists and Insert — so every tool is easy to find.
 
 1. Create the Play Console app with package `app.ochre.notes` and enroll in Play App
    Signing. Upload `app/build/outputs/bundle/release/app-release.aab`.
-2. Back up `keystore/ochre-upload.jks` and the passwords in `keystore.properties`
+2. Create the one-time product `remove_ads` under **Monetize → Products → In-app
+   products**, set its price to **$4.99 USD** (Play converts it per market), and activate
+   it. The ID must match `BillingConfig.REMOVE_ADS_PRODUCT_ID`; the app shows Google's
+   formatted local price, with `$4.99` only as a placeholder until Play responds.
+3. Back up `keystore/ochre-upload.jks` and the passwords in `keystore.properties`
    somewhere safe and offline. Without the upload key you cannot ship updates.
-3. Paste the short/full description, upload the icon, feature graphic and screenshots.
-4. Complete Data safety exactly as above, content rating, and target audience.
-5. Add `[PRIVACY URL]` (host `PRIVACY.md`) and `[SUPPORT EMAIL]`; both are mandatory.
-6. Before production, replace the test banner/interstitial/rewarded unit IDs in
+4. Paste the short/full description, upload the icon, feature graphic and screenshots.
+5. Complete Data safety exactly as above, content rating, and target audience. Declare
+   in-app purchases in the pricing section.
+6. Add `[PRIVACY URL]` (host `PRIVACY.md`) and `[SUPPORT EMAIL]`; both are mandatory.
+7. Before production, replace the test banner/interstitial/rewarded unit IDs in
    `AdConfig.kt` and the test App ID in `AndroidManifest.xml` with live AdMob IDs, and add
    the Google UMP consent flow for EEA/UK users.
-7. Run an internal testing track with a signed AAB, verify install from Play on a clean
-   device, then promote to production.
+8. Run an internal testing track with a signed AAB, add your account as a license tester,
+   buy `remove_ads` with a test card, and confirm the banner and interstitial stay off
+   after reinstalling. Then promote to production.
 
 ## Pre-publish verification
 
@@ -177,3 +197,6 @@ labeled menus — Format, Lists and Insert — so every tool is easy to find.
   `CN=Ochre Notes`
 - Fresh install: onboarding, create/edit note, reminder fires, backup/restore, biometric
   lock, widget and tile all work offline (airplane mode); ads simply do not appear.
+- Billing (only after the Play Console product exists): purchase `remove_ads` as a license
+  tester, confirm the banner and interstitial stop and the entitlement survives a restart
+  and reinstall. Before that, the Buy button reports that Google Play is not ready.

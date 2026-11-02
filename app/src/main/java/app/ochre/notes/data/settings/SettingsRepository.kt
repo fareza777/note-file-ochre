@@ -79,6 +79,8 @@ class SettingsRepository(context: Context) {
 
     suspend fun setAdFreeUntil(at: Long) = update { it.copy(adFreeUntil = at) }
 
+    suspend fun setAdsRemoved(removed: Boolean) = update { it.copy(adsRemoved = removed) }
+
     private fun Preferences.toSettings(): UserSettings = UserSettings(
         themeMode = runCatching { ThemeMode.valueOf(this[Keys.THEME] ?: ThemeMode.Light.name) }
             .getOrDefault(ThemeMode.Light),
@@ -104,6 +106,7 @@ class SettingsRepository(context: Context) {
         lastBackupAt = this[Keys.LAST_BACKUP_AT],
         vaultPassphraseSet = this[Keys.VAULT_PASSPHRASE] ?: false,
         adFreeUntil = this[Keys.AD_FREE_UNTIL] ?: 0L,
+        adsRemoved = this[Keys.ADS_REMOVED] ?: false,
     )
 
     private fun MutablePreferences.write(settings: UserSettings) {
@@ -127,6 +130,7 @@ class SettingsRepository(context: Context) {
         settings.lastBackupAt?.let { this[Keys.LAST_BACKUP_AT] = it } ?: remove(Keys.LAST_BACKUP_AT)
         this[Keys.VAULT_PASSPHRASE] = settings.vaultPassphraseSet
         this[Keys.AD_FREE_UNTIL] = settings.adFreeUntil
+        this[Keys.ADS_REMOVED] = settings.adsRemoved
     }
 
     private object Keys {
@@ -150,6 +154,7 @@ class SettingsRepository(context: Context) {
         val LAST_BACKUP_AT = longPreferencesKey("last_backup_at")
         val VAULT_PASSPHRASE = booleanPreferencesKey("vault_passphrase_set")
         val AD_FREE_UNTIL = longPreferencesKey("ad_free_until")
+        val ADS_REMOVED = booleanPreferencesKey("ads_removed")
     }
 
     private companion object {

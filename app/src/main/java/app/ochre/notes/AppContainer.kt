@@ -2,6 +2,7 @@ package app.ochre.notes
 
 import android.content.Context
 import app.ochre.notes.ads.AdManager
+import app.ochre.notes.billing.BillingManager
 import app.ochre.notes.data.NoteRepository
 import app.ochre.notes.data.backup.BackupManager
 import app.ochre.notes.data.local.OchreDatabase
@@ -13,6 +14,7 @@ import app.ochre.notes.notifications.ReminderScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class DraftInbox {
     @Volatile
@@ -42,6 +44,10 @@ class AppContainer(context: Context) {
     val attachmentStore = AttachmentStore(appContext)
 
     val settingsRepository = SettingsRepository(appContext)
+
+    val billingManager = BillingManager(appContext, appScope) { owned ->
+        appScope.launch { settingsRepository.setAdsRemoved(owned) }
+    }
 
     val noteRepository = NoteRepository(database, attachmentStore)
 

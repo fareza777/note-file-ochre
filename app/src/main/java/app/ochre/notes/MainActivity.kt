@@ -70,7 +70,7 @@ class MainActivity : FragmentActivity() {
                                 onDraftOpened = { draftRequested = false },
                                 initialRoute = deepLinkRoute,
                                 onInitialRouteConsumed = { deepLinkRoute = null },
-                                adsFree = settings.adFreeUntil > System.currentTimeMillis(),
+                                adsFree = settings.adsRemoved || settings.adFreeUntil > System.currentTimeMillis(),
                             )
                         }
                     }
@@ -83,6 +83,11 @@ class MainActivity : FragmentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleIntent(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        container.billingManager.refresh()
     }
 
     override fun onStop() {

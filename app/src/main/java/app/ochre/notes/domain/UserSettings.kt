@@ -23,4 +23,5 @@ data class UserSettings(
     val lastBackupAt: Long? = null,
     val vaultPassphraseSet: Boolean = false,
     val adFreeUntil: Long = 0L,
+    val adsRemoved: Boolean = false,
 )

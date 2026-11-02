@@ -11,7 +11,10 @@ the app does with information, in plain language.
 - There are **no** accounts, analytics, or crash-reporting SDKs.
 - The free app shows ads from Google AdMob, which may collect a device identifier and ad
   interaction data to serve and measure ads. Note content is never sent to advertisers.
-- Network access is used only for ads and optional encrypted WebDAV sync.
+- You can remove ads permanently with a one-time purchase. Google Play processes the
+  payment; Ochre never receives your payment details.
+- Network access is used only for ads, the remove-ads purchase, and optional encrypted
+  WebDAV sync.
 - Writing, editing and search work fully offline.
 
 ## What is stored on your device
@@ -20,7 +23,7 @@ the app does with information, in plain language.
 | --- | --- | --- |
 | Notes, tags, links, reminders | App-private SQLite database (Room) | Your notebook |
 | Photos, voice memos, files | App-private `files/attachments/` | Attachments you add |
-| Preferences (theme, lock timeout, sync server, onboarding, ad-free time) | App-private DataStore | App behaviour |
+| Preferences (theme, lock timeout, sync server, onboarding, ad-free time, remove-ads status) | App-private DataStore | App behaviour |
 | Encrypted backups | The location you choose (`.ochre` file) | Backup and restore |
 | Markdown exports | The location you choose (`.zip`) | Portable export |
 
@@ -35,6 +38,7 @@ you saved them.
 | `POST_NOTIFICATIONS` | When you set your first reminder | Reminder notifications and their inline actions |
 | `INTERNET` | Never prompted | Requesting ads and optional WebDAV sync to a server **you** configure |
 | `ACCESS_NETWORK_STATE` | Never prompted | Lets the ad SDK check connectivity before requesting an ad |
+| `com.android.vending.BILLING` | When you buy Remove ads | One-time purchase processed by Google Play; Ochre stores only a local entitlement |
 | `VIBRATE` | Never prompted | Haptic feedback for reminders |
 | Biometric / device credential | When you enable App lock | Unlocking Ochre through the system biometric prompt. Ochre never receives your fingerprint, face data or PIN |
 
@@ -45,7 +49,14 @@ picker. Ochre receives only the items you pick.
 
 Ochre is free and supported by ads served by Google AdMob. The timeline shows a small
 banner above the tab bar, an interstitial may appear after closing several notes, and
-Settings offers an optional rewarded ad that hides banners for 24 hours.
+Settings offers two ways to turn ads off: a one-time in-app purchase that removes them
+permanently, or an optional rewarded ad that hides them for 24 hours.
+
+The purchase is processed entirely by Google Play. Ochre receives only the product ID and
+a purchase token to verify entitlement; it never sees your name, card or billing address.
+The app stores a local yes/no entitlement so ads stay off offline and after a restart.
+Google handles purchase data under its own privacy policy
+(<https://policies.google.com/privacy>).
 
 Ochre never sends note titles, note content, tags, attachments, search queries or your
 sync credentials to the ad SDK. Ad requests may include technical information such as

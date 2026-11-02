@@ -45,7 +45,9 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SettingsBrightness
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.Verified
 import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -237,9 +239,13 @@ fun SettingsScreen(
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val adManager = LocalAppContainer.current.adManager
+    val billingManager = LocalAppContainer.current.billingManager
     val rewardedReady by adManager.rewardedReady.collectAsStateWithLifecycle()
+    val billingPrice by billingManager.price.collectAsStateWithLifecycle()
+    val billingOwned by billingManager.owned.collectAsStateWithLifecycle()
     val activity = context as? Activity
-    val adFree = settings.adFreeUntil > System.currentTimeMillis()
+    val rewardedFree = settings.adFreeUntil > System.currentTimeMillis()
+    val adsRemoved = settings.adsRemoved || billingOwned
     var showCredits by remember { mutableStateOf(false) }
     var showPrivacy by remember { mutableStateOf(false) }
     var vaultDialog by remember { mutableStateOf<VaultDialog?>(null) }
@@ -249,6 +255,8 @@ fun SettingsScreen(
 
     LaunchedEffect(Unit) { viewModel.events.collect { showMessage(it) } }
     LaunchedEffect(Unit) { adManager.loadRewarded() }
+    LaunchedEffect(Unit) { billingManager.events.collect { showMessage(it) } }
+    LaunchedEffect(Unit) { billingManager.refresh() }
 
     val createBackupLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream"),
@@ -498,7 +506,7 @@ fun SettingsScreen(
             SettingsCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        Icons.Outlined.PlayCircle,
+                        if (adsRemoved) Icons.Outlined.Verified else Icons.Outlined.WorkspacePremium,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.size(22.dp),
@@ -506,39 +514,82 @@ fun SettingsScreen(
                     Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
-                            if (adFree) "Ad-free until ${Formatting.dateTime(settings.adFreeUntil)}" else "Support Ochre",
+                            if (adsRemoved) "Ads removed" else "Remove ads",
                             style = MaterialTheme.typography.titleSmall,
                         )
                         Text(
-                            if (adFree) {
-                                "Thank you for watching. Banners are hidden until then."
+                            if (adsRemoved) {
+                                "Thank you for supporting Ochre — forever."
                             } else {
-                                "Watch a short ad to hide banners for 24 hours"
+                                "One-time purchase · $billingPrice"
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    if (!adFree) {
+                    if (!adsRemoved) {
                         TextButton(
                             onClick = {
                                 val host = activity
-                                if (host == null || !rewardedReady) {
-                                    adManager.loadRewarded()
-                                    showMessage("The ad is still loading. Try again in a moment.")
+                                if (host == null) {
+                                    showMessage("Purchases are not available right now.")
                                 } else {
-                                    adManager.showRewarded(
-                                        activity = host,
-                                        onEarned = {
-                                            viewModel.grantAdFree()
-                                            showMessage("Thank you — no banners for 24 hours")
-                                        },
-                                        onUnavailable = { showMessage("The ad is not ready. Try again in a moment.") },
-                                    )
+                                    billingManager.purchase(host)
                                 }
                             },
                         ) {
-                            Text("Watch ad")
+                            Text("Buy")
+                        }
+                    }
+                }
+                if (!adsRemoved) {
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    Spacer(Modifier.height(14.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Outlined.PlayCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.size(22.dp),
+                        )
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                if (rewardedFree) "Ad-free until ${Formatting.dateTime(settings.adFreeUntil)}" else "Or watch a short ad",
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            Text(
+                                if (rewardedFree) {
+                                    "Banners and interstitials are hidden until then."
+                                } else {
+                                    "Hide ads for 24 hours, free"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (!rewardedFree) {
+                            TextButton(
+                                onClick = {
+                                    val host = activity
+                                    if (host == null || !rewardedReady) {
+                                        adManager.loadRewarded()
+                                        showMessage("The ad is still loading. Try again in a moment.")
+                                    } else {
+                                        adManager.showRewarded(
+                                            activity = host,
+                                            onEarned = {
+                                                viewModel.grantAdFree()
+                                                showMessage("Thank you — no banners for 24 hours")
+                                            },
+                                            onUnavailable = { showMessage("The ad is not ready. Try again in a moment.") },
+                                        )
+                                    }
+                                },
+                            ) {
+                                Text("Watch ad")
+                            }
                         }
                     }
                 }
@@ -609,7 +660,7 @@ fun SettingsScreen(
             text = {
                 Text(
                     "Ochre keeps your notes on this device. There is no account, and your writing is never sent to advertisers.\n\n" +
-                        "The free version shows ads from Google AdMob, which may use a device identifier to select and measure ads. You can watch a rewarded ad to hide banners for 24 hours.\n\n" +
+                        "The free version shows ads from Google AdMob, which may use a device identifier to select and measure ads. You can remove ads permanently with a one-time purchase through Google Play, or watch a rewarded ad to hide banners for 24 hours. Ochre stores only the purchase status on this device.\n\n" +
                         "Optional backup and sync are end-to-end encrypted and only run when you turn them on. Biometric data never leaves your device's secure hardware.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
