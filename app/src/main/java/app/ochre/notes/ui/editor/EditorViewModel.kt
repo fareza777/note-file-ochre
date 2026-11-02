@@ -12,6 +12,7 @@ import app.ochre.notes.data.media.AttachmentStore
 import app.ochre.notes.data.media.AudioRecorder
 import app.ochre.notes.domain.MarkdownUtils
 import app.ochre.notes.domain.MemoUi
+import app.ochre.notes.domain.NotebookUi
 import app.ochre.notes.domain.OutgoingLinkUi
 import app.ochre.notes.notifications.ReminderScheduler
 import java.io.File
@@ -61,6 +62,8 @@ data class EditorState(
     val staged: List<EditorAttachment> = emptyList(),
     val error: String? = null,
     val importing: Int = 0,
+    val notebookUid: String? = null,
+    val accentColor: Int? = null,
 ) {
     val attachments: List<EditorAttachment>
         get() = memo?.attachments?.map { attachment ->
@@ -135,6 +138,9 @@ class EditorViewModel(
             if (uid == null) flowOf(emptyList<OutgoingLinkUi>()) else repository.observeOutgoingLinks(uid)
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val notebooks: StateFlow<List<NotebookUi>> =
+        repository.notebooks.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val messages = Channel<String>(Channel.BUFFERED)
     val message = messages.receiveAsFlow()
@@ -223,6 +229,51 @@ class EditorViewModel(
                 file.delete()
                 messages.trySend(it.message ?: "Could not add sketch")
             }
+        }
+    }
+
+    fun addCameraPhoto(file: File) {
+        viewModelScope.launch {
+            runCatching {
+                val existing = _state.value.uid
+                if (existing != null) {
+                    repository.attachImage(existing, file, originalName = "Camera photo")
+                } else {
+                    val entity = repository.stageImage(file, draftUid, originalName = "Camera photo")
+                    _state.update { it.copy(staged = it.staged + entity.toEditor(staged = true)) }
+                }
+            }.onFailure {
+                file.delete()
+                messages.trySend(it.message ?: "Could not add photo")
+            }
+        }
+    }
+
+    fun setNotebook(notebookUid: String?) {
+        _state.update { it.copy(notebookUid = notebookUid) }
+        viewModelScope.launch {
+            val uid = _state.value.uid ?: return@launch
+            repository.setMemoNotebook(uid, notebookUid)
+        }
+    }
+
+    fun setAccent(color: Int?) {
+        _state.update { it.copy(accentColor = color) }
+        viewModelScope.launch {
+            val uid = _state.value.uid ?: return@launch
+            repository.setMemoAccent(uid, color)
+        }
+    }
+
+    fun createNotebookForNote(name: String, color: Int) {
+        viewModelScope.launch {
+            val uid = repository.createNotebook(name, color)
+            if (uid == null) {
+                messages.trySend("Notebook needs a name")
+                return@launch
+            }
+            setNotebook(uid)
+            messages.trySend("Notebook created")
         }
     }
 
@@ -412,8 +463,12 @@ class EditorViewModel(
         val uid = repository.createMemoWithAttachments(
             content = snapshot.content,
             staged = snapshot.staged.map { it.toEntity() },
+            notebookUid = snapshot.notebookUid,
         )
         _state.update { it.copy(uid = uid, staged = emptyList()) }
+        if (snapshot.accentColor != null) {
+            repository.setMemoAccent(uid, snapshot.accentColor)
+        }
         _uid.value = uid
         _titleNorm.value = MarkdownUtils.parse(snapshot.content).titleNorm
         startObserving(uid)
@@ -433,9 +488,15 @@ class EditorViewModel(
                             initialized = true,
                             memo = memo,
                             savedAt = memo.updatedAt,
+                            notebookUid = memo.notebookUid,
+                            accentColor = memo.accentColor,
                         )
                     } else {
-                        current.copy(memo = memo)
+                        current.copy(
+                            memo = memo,
+                            notebookUid = memo.notebookUid,
+                            accentColor = memo.accentColor,
+                        )
                     }
                 }
                 _titleNorm.value = memo.titleNorm

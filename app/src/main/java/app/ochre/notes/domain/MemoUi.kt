@@ -12,6 +12,13 @@ data class TagUi(
     val count: Int = 0,
 )
 
+data class NotebookUi(
+    val uid: String,
+    val name: String,
+    val color: Int,
+    val count: Int = 0,
+)
+
 data class AttachmentUi(
     val uid: String,
     val kind: AttachmentKind,
@@ -51,6 +58,10 @@ data class MemoUi(
     val openedAt: Long?,
     val echoLevel: Int,
     val echoedAt: Long?,
+    val notebookUid: String? = null,
+    val notebookName: String? = null,
+    val notebookColor: Int? = null,
+    val accentColor: Int? = null,
     val tags: List<TagUi>,
     val attachments: List<AttachmentUi>,
     val reminders: List<ReminderUi>,
@@ -103,6 +114,10 @@ fun MemoWithMeta.toUi(
     openedAt = memo.openedAt,
     echoLevel = memo.echoLevel,
     echoedAt = memo.echoedAt,
+    notebookUid = memo.notebookUid,
+    notebookName = notebook?.takeIf { it.deletedAt == null }?.name,
+    notebookColor = notebook?.takeIf { it.deletedAt == null }?.color,
+    accentColor = memo.accentColor,
     tags = tags.sortedBy { it.tagDisplay.lowercase() }.map { TagUi(it.tagNorm, it.tagDisplay) },
     attachments = attachments
         .filter { it.deletedAt == null }

@@ -45,7 +45,7 @@ import androidx.compose.ui.unit.sp
 import app.ochre.notes.domain.MarkdownUtils
 import app.ochre.notes.ui.theme.MonoFamily
 
-private enum class TableAlign { Start, Center, End }
+internal enum class TableAlign { Start, Center, End }
 
 private fun TableAlign.textAlign(): TextAlign = when (this) {
     TableAlign.Start -> TextAlign.Start
@@ -53,7 +53,7 @@ private fun TableAlign.textAlign(): TextAlign = when (this) {
     TableAlign.End -> TextAlign.End
 }
 
-private sealed interface MdBlock {
+internal sealed interface MdBlock {
     data class Heading(val level: Int, val text: String) : MdBlock
 
     data class Paragraph(val text: String) : MdBlock
@@ -87,7 +87,7 @@ private val quoteRegex = Regex("^\\s{0,3}>\\s?(.*)$")
 private val dividerRegex = Regex("^\\s{0,3}([-*_])(?:\\s*\\1){2,}\\s*$")
 private val tableSeparatorRegex = Regex("^\\s*\\|?\\s*:?-{3,}:?\\s*(\\|\\s*:?-{3,}:?\\s*)+\\|?\\s*$")
 
-private fun parseBlocks(source: String): List<MdBlock> {
+internal fun parseBlocks(source: String): List<MdBlock> {
     if (source.isBlank()) return emptyList()
     val lines = source.lines()
     val blocks = mutableListOf<MdBlock>()
@@ -241,34 +241,83 @@ fun MarkdownText(
     lineOffset: Int = 0,
 ) {
     val blocks = remember(text) { parseBlocks(text) }
+    val bodyStyle = baseStyle.copy(color = MaterialTheme.colorScheme.onSurface)
     Column(modifier, verticalArrangement = Arrangement.spacedBy(9.dp)) {
         blocks.forEach { block ->
             when (block) {
                 is MdBlock.Heading -> {
                     val style = when (block.level) {
-                        1 -> MaterialTheme.typography.headlineLarge
+                        1 -> MaterialTheme.typography.displaySmall
                         2 -> MaterialTheme.typography.headlineMedium
                         3 -> MaterialTheme.typography.headlineSmall
-                        else -> MaterialTheme.typography.titleLarge
+                        4 -> MaterialTheme.typography.titleLarge
+                        5 -> MaterialTheme.typography.titleMedium
+                        else -> MaterialTheme.typography.titleSmall
                     }
-                    Spacer(Modifier.height(if (block.level <= 2) 8.dp else 2.dp))
-                    InlineMarkdown(block.text, style.copy(color = MaterialTheme.colorScheme.onSurface), onWikiLink, onTag)
+                    Spacer(
+                        Modifier.height(
+                            when (block.level) {
+                                1 -> 16.dp
+                                2 -> 12.dp
+                                3 -> 8.dp
+                                else -> 4.dp
+                            },
+                        ),
+                    )
+                    if (block.level == 1) {
+                        Column {
+                            InlineMarkdown(
+                                block.text,
+                                style.copy(color = MaterialTheme.colorScheme.onSurface),
+                                onWikiLink,
+                                onTag,
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Box(
+                                Modifier
+                                    .width(34.dp)
+                                    .height(2.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f),
+                                        RoundedCornerShape(1.dp),
+                                    ),
+                            )
+                        }
+                    } else {
+                        InlineMarkdown(
+                            block.text,
+                            style.copy(color = MaterialTheme.colorScheme.onSurface),
+                            onWikiLink,
+                            onTag,
+                        )
+                    }
                 }
-                is MdBlock.Paragraph -> InlineMarkdown(block.text, baseStyle, onWikiLink, onTag)
-                is MdBlock.Quote -> Row(Modifier.height(IntrinsicSize.Min)) {
-                    Box(
+                is MdBlock.Paragraph -> InlineMarkdown(block.text, bodyStyle, onWikiLink, onTag)
+                is MdBlock.Quote -> Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.8f),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
                         Modifier
-                            .width(3.dp)
-                            .fillMaxHeight()
-                            .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.55f), RoundedCornerShape(2.dp)),
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    InlineMarkdown(
-                        block.text,
-                        baseStyle.copy(fontStyle = FontStyle.Italic, color = MaterialTheme.colorScheme.onSurfaceVariant),
-                        onWikiLink,
-                        onTag,
-                    )
+                            .height(IntrinsicSize.Min)
+                            .padding(end = 14.dp),
+                    ) {
+                        Box(
+                            Modifier
+                                .width(3.dp)
+                                .fillMaxHeight()
+                                .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)),
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        InlineMarkdown(
+                            block.text,
+                            baseStyle.copy(fontStyle = FontStyle.Italic, color = MaterialTheme.colorScheme.onSurfaceVariant),
+                            onWikiLink,
+                            onTag,
+                            modifier = Modifier.padding(vertical = 12.dp),
+                        )
+                    }
                 }
                 is MdBlock.Bullet -> {
                     val toggleLine = block.line.takeIf { block.checked != null && onToggleCheckbox != null }
@@ -292,7 +341,7 @@ fun MarkdownText(
                         } else {
                             Text(
                                 text = block.marker,
-                                style = baseStyle,
+                                style = bodyStyle,
                                 color = MaterialTheme.colorScheme.tertiary,
                                 modifier = Modifier.width(22.dp),
                             )
@@ -301,12 +350,12 @@ fun MarkdownText(
                         InlineMarkdown(
                             block.text,
                             if (block.checked == true) {
-                                baseStyle.copy(
+                                bodyStyle.copy(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textDecoration = TextDecoration.LineThrough,
                                 )
                             } else {
-                                baseStyle
+                                bodyStyle
                             },
                             onWikiLink,
                             onTag,
@@ -353,7 +402,11 @@ private fun MarkdownTable(
 ) {
     val border = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
     val horizontalBorder = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-    val cellStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp, lineHeight = 20.sp)
+    val cellStyle = MaterialTheme.typography.bodyMedium.copy(
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+        color = MaterialTheme.colorScheme.onSurface,
+    )
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val tableWidth = maxOf(maxWidth, (table.header.size * 96).dp)
         Surface(

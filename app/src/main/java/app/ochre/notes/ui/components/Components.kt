@@ -12,9 +12,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -294,7 +296,16 @@ fun MemoCard(
             if (selected) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
         ),
     ) {
-        Column(Modifier.padding(18.dp)) {
+        Row(Modifier.height(IntrinsicSize.Min)) {
+            memo.accentColor?.let { accent ->
+                Box(
+                    Modifier
+                        .width(4.dp)
+                        .fillMaxHeight()
+                        .background(Color(accent)),
+                )
+            }
+            Column(Modifier.weight(1f).padding(18.dp)) {
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
                     if (locked) {
@@ -400,9 +411,22 @@ fun MemoCard(
                 }
             }
 
-            if (memo.tags.isNotEmpty() || memo.activeReminder != null || (showTime)) {
+            if (memo.tags.isNotEmpty() || memo.activeReminder != null || memo.notebookName != null || showTime) {
                 Spacer(Modifier.height(14.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    val notebookName = memo.notebookName
+                    if (notebookName != null) {
+                        NotebookDot(notebookColor(memo.notebookColor), 7.dp)
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            text = notebookName,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (showTime) Spacer(Modifier.width(9.dp))
+                    }
                     if (showTime) {
                         Text(
                             text = if (Formatting.dayOf(memo.createdAt) == Formatting.dayOf(now)) {
@@ -457,6 +481,7 @@ fun MemoCard(
                         }
                     }
                 }
+            }
             }
         }
     }

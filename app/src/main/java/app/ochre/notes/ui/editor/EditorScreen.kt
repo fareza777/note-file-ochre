@@ -1,6 +1,7 @@
 package app.ochre.notes.ui.editor
 
 import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -42,9 +43,12 @@ import androidx.compose.material.icons.automirrored.rounded.NoteAdd
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.AttachFile
+import androidx.compose.material.icons.outlined.Book
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.LockClock
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AddPhotoAlternate
@@ -63,6 +67,7 @@ import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.TableChart
@@ -117,13 +122,17 @@ import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.ochre.notes.data.local.AttachmentKind
 import app.ochre.notes.domain.MarkdownUtils
 import app.ochre.notes.domain.MemoUi
+import app.ochre.notes.ui.components.AccentPickerDialog
 import app.ochre.notes.ui.components.AudioBar
+import app.ochre.notes.ui.components.CreateNotebookDialog
 import app.ochre.notes.ui.components.ImageViewerDialog
 import app.ochre.notes.ui.components.MarkdownText
+import app.ochre.notes.ui.components.NotebookPickerDialog
 import app.ochre.notes.ui.components.SoftIconButton
 import app.ochre.notes.ui.components.TagChip
 import app.ochre.notes.ui.components.WaveformBars
@@ -133,6 +142,9 @@ import app.ochre.notes.ui.theme.ochrePaper
 import app.ochre.notes.ui.util.Formatting
 import coil.compose.AsyncImage
 import java.io.File
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -159,6 +171,7 @@ fun EditorScreen(
     val recording by viewModel.recording.collectAsStateWithLifecycle()
     val backlinks by viewModel.backlinks.collectAsStateWithLifecycle()
     val outgoing by viewModel.outgoingLinks.collectAsStateWithLifecycle()
+    val notebooks by viewModel.notebooks.collectAsStateWithLifecycle()
 
     var fieldValue by remember { mutableStateOf(TextFieldValue(state.content)) }
     var seeded by remember { mutableStateOf(initialUid == null) }
@@ -174,6 +187,9 @@ fun EditorScreen(
     var matchIndex by remember { mutableIntStateOf(0) }
     var showOutline by remember { mutableStateOf(false) }
     var showSketch by remember { mutableStateOf(false) }
+    var showNotebookPicker by remember { mutableStateOf(false) }
+    var showNotebookCreate by remember { mutableStateOf(false) }
+    var showAccentPicker by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val findFocusRequester = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
@@ -265,6 +281,28 @@ fun EditorScreen(
     val filePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments(),
     ) { uris -> viewModel.addFiles(uris) }
+    var pendingCameraFile by remember { mutableStateOf<File?>(null) }
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture(),
+    ) { success ->
+        val file = pendingCameraFile
+        pendingCameraFile = null
+        if (success && file != null && file.length() > 0) {
+            viewModel.addCameraPhoto(file)
+        } else {
+            file?.delete()
+        }
+    }
+    val launchCamera = {
+        runCatching {
+            val directory = File(context.cacheDir, "shared").apply { mkdirs() }
+            val file = File(directory, "camera-${System.currentTimeMillis()}.jpg")
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+            pendingCameraFile = file
+            cameraLauncher.launch(uri)
+        }.onFailure { showMessage(it.message ?: "Camera is unavailable") }
+        Unit
+    }
     val recordPermission = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -302,7 +340,24 @@ fun EditorScreen(
     }
     BackHandler(onBack = back)
 
+    val exportPdf: () -> Unit = {
+        keyboard?.hide()
+        val title = state.title.ifBlank { "Untitled" }
+        val images = state.attachments.filter { it.kind == AttachmentKind.IMAGE }.mapNotNull { it.file }
+        val content = state.content
+        val accent = state.accentColor
+        scope.launch {
+            runCatching { PdfExporter(context).export(title, content, images, accent) }
+                .onSuccess { file ->
+                    sharePdf(context, file)
+                    showMessage("PDF ready")
+                }
+                .onFailure { showMessage(it.message ?: "Could not export PDF") }
+        }
+    }
+
     val tags = remember(state.content) { MarkdownUtils.parse(state.content).tags }
+    val currentNotebookName = state.notebookUid?.let { uid -> notebooks.firstOrNull { it.uid == uid }?.name }
 
     Column(
         modifier = Modifier
@@ -453,6 +508,18 @@ fun EditorScreen(
                             }
                         },
                     )
+                    if (fieldValue.text.isBlank() && state.attachments.isEmpty()) {
+                        TemplateStrip(
+                            onPick = { template ->
+                                fieldValue = TextFieldValue(template.content, TextRange(template.content.length))
+                                viewModel.onContentChange(template.content)
+                                scope.launch {
+                                    delay(80)
+                                    focusRequester.requestFocus()
+                                }
+                            },
+                        )
+                    }
                     if (state.importing > 0) {
                         Row(
                             Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
@@ -493,6 +560,10 @@ fun EditorScreen(
                                 EditorAction.Photo -> imagePicker.launch(
                                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                                 )
+                                EditorAction.Camera -> {
+                                    keyboard?.hide()
+                                    launchCamera()
+                                }
                                 EditorAction.File -> filePicker.launch(arrayOf("*/*"))
                                 EditorAction.Record -> requestRecording()
                                 EditorAction.Sketch -> {
@@ -561,6 +632,34 @@ fun EditorScreen(
             },
         )
         DropdownMenuItem(
+            text = {
+                Text(
+                    text = currentNotebookName?.let { "Notebook · $it" } ?: "Move to notebook",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            },
+            leadingIcon = { Icon(Icons.Outlined.Book, null) },
+            onClick = {
+                showMenu = false
+                showNotebookPicker = true
+            },
+        )
+        DropdownMenuItem(
+            text = { Text("Note colour") },
+            leadingIcon = {
+                Icon(
+                    Icons.Outlined.Palette,
+                    null,
+                    tint = state.accentColor?.let { Color(it) } ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            onClick = {
+                showMenu = false
+                showAccentPicker = true
+            },
+        )
+        DropdownMenuItem(
             text = { Text("Find & replace") },
             leadingIcon = { Icon(Icons.Rounded.Search, null) },
             onClick = {
@@ -593,6 +692,14 @@ fun EditorScreen(
                 showMenu = false
                 keyboard?.hide()
                 viewModel.duplicate { uid -> onOpenNote(uid) }
+            },
+        )
+        DropdownMenuItem(
+            text = { Text("Export as PDF") },
+            leadingIcon = { Icon(Icons.Outlined.PictureAsPdf, null) },
+            onClick = {
+                showMenu = false
+                exportPdf()
             },
         )
         DropdownMenuItem(
@@ -803,6 +910,34 @@ fun EditorScreen(
             onMessage = showMessage,
         )
     }
+
+    if (showNotebookPicker) {
+        NotebookPickerDialog(
+            notebooks = notebooks,
+            selectedUid = state.notebookUid,
+            onSelect = { viewModel.setNotebook(it) },
+            onDismiss = { showNotebookPicker = false },
+            onCreate = {
+                showNotebookPicker = false
+                showNotebookCreate = true
+            },
+        )
+    }
+
+    if (showNotebookCreate) {
+        CreateNotebookDialog(
+            onDismiss = { showNotebookCreate = false },
+            onCreate = { name, color -> viewModel.createNotebookForNote(name, color) },
+        )
+    }
+
+    if (showAccentPicker) {
+        AccentPickerDialog(
+            selected = state.accentColor,
+            onSelect = { viewModel.setAccent(it) },
+            onDismiss = { showAccentPicker = false },
+        )
+    }
 }
 
 @Composable
@@ -938,7 +1073,7 @@ private fun EditorTopBar(
 }
 
 private enum class EditorAction {
-    H1, H2, Bold, Italic, Strike, Bullet, Numbered, Checkbox, Quote, Code, Table, Link, Tag, Photo, File, Record, Sketch,
+    H1, H2, Bold, Italic, Strike, Bullet, Numbered, Checkbox, Quote, Code, Table, Link, Tag, Photo, Camera, File, Record, Sketch,
 }
 
 private enum class EditorMenu { None, Format, Lists, Insert }
@@ -1018,6 +1153,7 @@ private fun EditorToolbar(onAction: (EditorAction) -> Unit) {
                 onDismiss = closeMenu,
             ) {
                 MenuAction("Photo from gallery", Icons.Rounded.AddPhotoAlternate) { closeMenu(); onAction(EditorAction.Photo) }
+                MenuAction("Camera", Icons.Rounded.PhotoCamera) { closeMenu(); onAction(EditorAction.Camera) }
                 MenuAction("File from phone", Icons.Outlined.AttachFile) { closeMenu(); onAction(EditorAction.File) }
                 MenuAction("Voice note", Icons.Rounded.Mic) { closeMenu(); onAction(EditorAction.Record) }
                 MenuAction("Sketch", Icons.Rounded.Brush) { closeMenu(); onAction(EditorAction.Sketch) }
@@ -1119,25 +1255,32 @@ private fun AttachmentSection(
     onOpenImage: (EditorAttachment) -> Unit,
 ) {
     if (attachments.isEmpty()) return
+    val context = LocalContext.current
+    val images = attachments.filter { it.kind == AttachmentKind.IMAGE }
     if (!editable) {
         Column(
             Modifier
                 .fillMaxWidth()
                 .padding(top = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            attachments.filter { it.kind == AttachmentKind.IMAGE }.forEach { attachment ->
-                AsyncImage(
-                    model = attachment.file,
-                    contentDescription = attachment.originalName ?: "Photo",
-                    contentScale = ContentScale.FillWidth,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 420.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                        .clickable { onOpenImage(attachment) },
-                )
+            images.chunked(2).forEach { pair ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    pair.forEach { attachment ->
+                        AsyncImage(
+                            model = attachment.file,
+                            contentDescription = attachment.originalName ?: "Photo",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(156.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                .clickable { onOpenImage(attachment) },
+                        )
+                    }
+                    if (pair.size == 1) Spacer(Modifier.weight(1f))
+                }
             }
             attachments.filter { it.kind != AttachmentKind.IMAGE }.forEach { attachment ->
                 AttachmentChip(attachment = attachment)
@@ -1145,83 +1288,140 @@ private fun AttachmentSection(
         }
         return
     }
-    LazyRow(
-        modifier = Modifier
+    Column(
+        Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(attachments, key = { it.uid }) { attachment ->
-            Box {
-                if (attachment.kind == AttachmentKind.AUDIO) {
-                    AudioBar(
-                        file = attachment.file,
-                        waveform = attachment.waveform,
-                        durationHint = attachment.durationMs,
-                        modifier = Modifier
-                            .width(236.dp)
-                            .height(76.dp),
-                    )
-                } else {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier
-                            .size(width = 92.dp, height = 76.dp)
-                            .then(
-                                if (attachment.kind == AttachmentKind.IMAGE) {
-                                    Modifier.clickable { onOpenImage(attachment) }
-                                } else {
-                                    Modifier
-                                },
-                            ),
+        images.chunked(2).forEach { pair ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                pair.forEach { attachment ->
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .height(140.dp),
                     ) {
-                        if (attachment.kind == AttachmentKind.IMAGE) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clickable { onOpenImage(attachment) },
+                        ) {
                             AsyncImage(
                                 model = attachment.thumbnail ?: attachment.file,
                                 contentDescription = attachment.originalName ?: "Photo",
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize(),
                             )
-                        } else {
-                            Column(
+                        }
+                        AttachmentRemoveBadge(
+                            uid = attachment.uid,
+                            onRemove = onRemove,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(4.dp),
+                        )
+                    }
+                }
+                if (pair.size == 1) Spacer(Modifier.weight(1f).height(140.dp))
+            }
+        }
+        attachments.filter { it.kind == AttachmentKind.AUDIO }.forEach { attachment ->
+            Box(Modifier.fillMaxWidth()) {
+                AudioBar(
+                    file = attachment.file,
+                    waveform = attachment.waveform,
+                    durationHint = attachment.durationMs,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(76.dp),
+                )
+                AttachmentRemoveBadge(
+                    uid = attachment.uid,
+                    onRemove = onRemove,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp),
+                )
+            }
+        }
+        attachments.filter { it.kind == AttachmentKind.FILE }.chunked(2).forEach { pair ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                pair.forEach { attachment ->
+                    Box(Modifier.weight(1f)) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.7f),
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(74.dp)
+                                .clickable { openAttachment(context, attachment.file, attachment.mimeType) },
+                        ) {
+                            Row(
                                 Modifier
                                     .fillMaxSize()
-                                    .padding(8.dp),
-                                verticalArrangement = Arrangement.Center,
-                                horizontalAlignment = Alignment.CenterHorizontally,
+                                    .padding(horizontal = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Icon(
                                     Icons.Rounded.InsertDriveFile,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.tertiary,
-                                    modifier = Modifier.size(20.dp),
+                                    modifier = Modifier.size(18.dp),
                                 )
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    Formatting.bytes(attachment.sizeBytes),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    maxLines = 1,
-                                )
+                                Spacer(Modifier.width(8.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        attachment.originalName ?: "File",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        Formatting.bytes(attachment.sizeBytes),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         }
+                        AttachmentRemoveBadge(
+                            uid = attachment.uid,
+                            onRemove = onRemove,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(4.dp),
+                        )
                     }
                 }
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(4.dp)
-                        .size(22.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.55f))
-                        .clickable { onRemove(attachment.uid) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Remove attachment", tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(13.dp))
-                }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
             }
         }
+    }
+}
+
+@Composable
+private fun AttachmentRemoveBadge(
+    uid: String,
+    onRemove: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .size(22.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.55f))
+            .clickable { onRemove(uid) },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Rounded.Close,
+            contentDescription = "Remove attachment",
+            tint = Color.White,
+            modifier = Modifier.size(13.dp),
+        )
     }
 }
 
@@ -1271,6 +1471,79 @@ private fun openAttachment(context: android.content.Context, file: File?, mimeTy
             .setDataAndType(uri, mimeType)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         context.startActivity(Intent.createChooser(intent, "Open attachment"))
+    }
+}
+
+private fun sharePdf(context: android.content.Context, file: File) {
+    runCatching {
+        val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+        val intent = Intent(Intent.ACTION_SEND)
+            .setType("application/pdf")
+            .putExtra(Intent.EXTRA_STREAM, uri)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        context.startActivity(Intent.createChooser(intent, "Share PDF"))
+    }
+}
+
+private data class NoteTemplate(
+    val name: String,
+    val description: String,
+    val content: String,
+)
+
+private fun noteTemplates(): List<NoteTemplate> {
+    val today = LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault()))
+    return listOf(
+        NoteTemplate(
+            name = "Daily note",
+            description = "Plan and reflect",
+            content = "## $today\n\n### Top of mind\n\n\n### Tasks\n\n- [ ] \n\n### Notes\n\n",
+        ),
+        NoteTemplate(
+            name = "Task list",
+            description = "Check things off",
+            content = "# Tasks\n\n- [ ] \n- [ ] \n- [ ] \n",
+        ),
+        NoteTemplate(
+            name = "Journal",
+            description = "How the day felt",
+            content = "## $today\n\n**How I feel**\n\n\n**What happened today**\n\n\n**Grateful for**\n\n- \n",
+        ),
+    )
+}
+
+@Composable
+private fun TemplateStrip(onPick: (NoteTemplate) -> Unit) {
+    val templates = remember { noteTemplates() }
+    Column(Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
+        Text(
+            "START WITH A TEMPLATE",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+        )
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            templates.forEach { template ->
+                Surface(
+                    onClick = { onPick(template) },
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)),
+                ) {
+                    Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                        Text(template.name, style = MaterialTheme.typography.labelLarge)
+                        Text(
+                            template.description,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

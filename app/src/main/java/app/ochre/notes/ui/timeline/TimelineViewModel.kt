@@ -7,6 +7,7 @@ import app.ochre.notes.data.settings.SettingsRepository
 import app.ochre.notes.domain.FeedFilter
 import app.ochre.notes.domain.FeedOrder
 import app.ochre.notes.domain.MemoUi
+import app.ochre.notes.domain.NotebookUi
 import app.ochre.notes.domain.SearchQuery
 import app.ochre.notes.domain.TagUi
 import kotlinx.coroutines.channels.Channel
@@ -27,17 +28,33 @@ class TimelineViewModel(
     private val filter = MutableStateFlow(FeedFilter.ALL)
     private val limit = MutableStateFlow(PAGE_SIZE)
     private val order = MutableStateFlow(FeedOrder.NEWEST)
+    private val notebookFilter = MutableStateFlow<String?>(null)
 
     val selectedFilter = filter.asStateFlow()
     val selectedOrder = order.asStateFlow()
+    val selectedNotebook = notebookFilter.asStateFlow()
+
+    private data class FeedParams(
+        val filter: FeedFilter,
+        val limit: Int,
+        val order: FeedOrder,
+        val notebookUid: String?,
+    )
 
     val notes: kotlinx.coroutines.flow.StateFlow<List<MemoUi>> =
-        combine(filter, limit, order) { selected, size, sort -> Triple(selected, size, sort) }
-            .flatMapLatest { (selected, size, sort) -> repository.observeFeed(selected, SearchQuery(), size, sort) }
+        combine(filter, limit, order, notebookFilter) { selected, size, sort, notebook ->
+            FeedParams(selected, size, sort, notebook)
+        }
+            .flatMapLatest { params ->
+                repository.observeFeed(params.filter, SearchQuery(), params.limit, params.order, params.notebookUid)
+            }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val tags: kotlinx.coroutines.flow.StateFlow<List<TagUi>> =
         repository.tags.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val notebooks: kotlinx.coroutines.flow.StateFlow<List<NotebookUi>> =
+        repository.notebooks.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val activeCount: kotlinx.coroutines.flow.StateFlow<Int> =
         repository.observeActiveCount().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
@@ -62,6 +79,32 @@ class TimelineViewModel(
         if (order.value == next) return
         order.value = next
         limit.value = PAGE_SIZE
+    }
+
+    fun setNotebookFilter(uid: String?) {
+        if (notebookFilter.value == uid) return
+        notebookFilter.value = uid
+        limit.value = PAGE_SIZE
+        if (uid != null) filter.value = FeedFilter.ALL
+    }
+
+    fun createNotebook(name: String, color: Int) = viewModelScope.launch {
+        val uid = repository.createNotebook(name, color)
+        if (uid == null) {
+            messages.trySend("Notebook needs a name")
+        } else {
+            messages.trySend("Notebook created")
+        }
+    }
+
+    fun renameNotebook(uid: String, name: String) = viewModelScope.launch {
+        repository.renameNotebook(uid, name)
+    }
+
+    fun deleteNotebook(uid: String) = viewModelScope.launch {
+        repository.deleteNotebook(uid)
+        if (notebookFilter.value == uid) notebookFilter.value = null
+        messages.trySend("Notebook removed, notes kept")
     }
 
     fun loadMore() {

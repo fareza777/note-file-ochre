@@ -107,6 +107,42 @@ interface LinkDao {
 }
 
 @Dao
+interface NotebookDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(notebook: NotebookEntity)
+
+    @Query("SELECT * FROM notebooks WHERE uid = :uid")
+    suspend fun findByUid(uid: String): NotebookEntity?
+
+    @Query("SELECT * FROM notebooks")
+    suspend fun all(): List<NotebookEntity>
+
+    @Query("UPDATE notebooks SET name = :name, updatedAt = :now WHERE uid = :uid")
+    suspend fun rename(uid: String, name: String, now: Long)
+
+    @Query("UPDATE notebooks SET deletedAt = :deletedAt, updatedAt = :now WHERE uid = :uid")
+    suspend fun setDeleted(uid: String, deletedAt: Long?, now: Long)
+
+    @Query("UPDATE memos SET notebookUid = NULL, updatedAt = :now WHERE notebookUid = :uid")
+    suspend fun detachMemos(uid: String, now: Long)
+
+    @Query(
+        """
+        SELECT n.uid AS uid, n.name AS name, n.color AS color, COUNT(m.id) AS count
+        FROM notebooks n
+        LEFT JOIN memos m ON m.notebookUid = n.uid
+          AND m.deletedAt IS NULL
+          AND m.archivedAt IS NULL
+          AND (m.sealedUntil IS NULL OR m.sealedUntil <= :now)
+        WHERE n.deletedAt IS NULL
+        GROUP BY n.uid
+        ORDER BY n.name COLLATE NOCASE ASC
+        """
+    )
+    fun observeWithCounts(now: Long): Flow<List<NotebookCount>>
+}
+
+@Dao
 interface ReminderDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(reminder: ReminderEntity)

@@ -20,6 +20,7 @@ import androidx.room.Relation
         Index("deletedAt"),
         Index("sealedUntil"),
         Index("titleNorm"),
+        Index("notebookUid"),
     ],
 )
 data class MemoEntity(
@@ -37,6 +38,18 @@ data class MemoEntity(
     val openedAt: Long? = null,
     val echoLevel: Int = 0,
     val echoedAt: Long? = null,
+    val notebookUid: String? = null,
+    val accentColor: Int? = null,
+)
+
+@Entity(tableName = "notebooks")
+data class NotebookEntity(
+    @PrimaryKey val uid: String,
+    val name: String,
+    val color: Int,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val deletedAt: Long? = null,
 )
 
 enum class AttachmentKind { IMAGE, AUDIO, FILE }
@@ -153,6 +166,15 @@ data class MemoWithMeta(
     val attachments: List<AttachmentEntity> = emptyList(),
     @Relation(parentColumn = "uid", entityColumn = "memoUid")
     val reminders: List<ReminderEntity> = emptyList(),
+    @Relation(parentColumn = "notebookUid", entityColumn = "uid")
+    val notebook: NotebookEntity? = null,
+)
+
+data class NotebookCount(
+    val uid: String,
+    val name: String,
+    val color: Int,
+    val count: Int,
 )
 
 data class TagCount(

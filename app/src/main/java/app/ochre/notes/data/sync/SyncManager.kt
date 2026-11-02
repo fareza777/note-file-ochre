@@ -2,11 +2,13 @@ package app.ochre.notes.data.sync
 
 import app.ochre.notes.data.backup.BackupAttachment
 import app.ochre.notes.data.backup.BackupMemo
+import app.ochre.notes.data.backup.BackupNotebook
 import app.ochre.notes.data.backup.BackupReminder
 import app.ochre.notes.data.backup.VaultCrypto
 import app.ochre.notes.data.backup.VaultMerger
 import app.ochre.notes.data.backup.toBackupAttachment
 import app.ochre.notes.data.backup.toBackupMemo
+import app.ochre.notes.data.backup.toBackupNotebook
 import app.ochre.notes.data.backup.toBackupReminder
 import app.ochre.notes.data.local.OchreDatabase
 import app.ochre.notes.data.media.AttachmentStore
@@ -34,6 +36,7 @@ data class SyncIndex(
     val version: Int = 1,
     val memos: Map<String, Long> = emptyMap(),
     val media: Map<String, Long> = emptyMap(),
+    val notebooks: Map<String, Long> = emptyMap(),
 )
 
 data class SyncResult(
@@ -81,11 +84,23 @@ class SyncManager(
             val localByUid = memos.associateBy { it.uid }
             val attachmentsByMemo = db.attachmentDao().allActive().groupBy { it.memoUid }
             val remindersByMemo = db.reminderDao().all().groupBy { it.memoUid }
+            val notebooks = db.notebookDao().all()
+            val localNotebooksByUid = notebooks.associateBy { it.uid }
 
             val nextMemos = index.memos.toMutableMap()
             val nextMedia = index.media.toMutableMap()
+            val nextNotebooks = index.notebooks.toMutableMap()
             var pushed = 0
             var bytesUp = 0L
+
+            notebooks.forEach { notebook ->
+                if (notebook.updatedAt <= (index.notebooks[notebook.uid] ?: 0L)) return@forEach
+                val body = sealed(json.encodeToString(BackupNotebook.serializer(), notebook.toBackupNotebook()), key)
+                client.put("notebooks/${notebook.uid}.ochre", body)
+                bytesUp += body.size
+                nextNotebooks[notebook.uid] = notebook.updatedAt
+                pushed++
+            }
 
             memos.forEach { memo ->
                 val remoteVersion = index.memos[memo.uid] ?: 0L
@@ -116,6 +131,13 @@ class SyncManager(
 
             var pulled = 0
             var media = 0
+            nextNotebooks.forEach { (uid, remoteVersion) ->
+                val local = localNotebooksByUid[uid]
+                if (local != null && local.updatedAt >= remoteVersion) return@forEach
+                val body = client.get("notebooks/$uid.ochre") ?: return@forEach
+                val payload = runCatching { decodeNotebook(body, key) }.getOrNull() ?: return@forEach
+                merger.mergeNotebooks(listOf(payload))
+            }
             nextMemos.forEach { (uid, remoteVersion) ->
                 val local = localByUid[uid]
                 if (local != null && local.updatedAt >= remoteVersion) return@forEach
@@ -132,7 +154,7 @@ class SyncManager(
                 pulled++
             }
 
-            val newIndex = SyncIndex(memos = nextMemos, media = nextMedia)
+            val newIndex = SyncIndex(memos = nextMemos, media = nextMedia, notebooks = nextNotebooks)
             client.put("index", sealed(json.encodeToString(SyncIndex.serializer(), newIndex), key))
 
             reminderScheduler.rescheduleAll()
@@ -163,4 +185,7 @@ class SyncManager(
 
     private fun decodeMemo(bytes: ByteArray, key: ByteArray): SyncMemoObject =
         json.decodeFromString(SyncMemoObject.serializer(), unsealed(bytes, key).toString(Charsets.UTF_8))
+
+    private fun decodeNotebook(bytes: ByteArray, key: ByteArray): BackupNotebook =
+        json.decodeFromString(BackupNotebook.serializer(), unsealed(bytes, key).toString(Charsets.UTF_8))
 }

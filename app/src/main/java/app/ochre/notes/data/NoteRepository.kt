@@ -13,6 +13,8 @@ import app.ochre.notes.data.local.MemoEntity
 import app.ochre.notes.data.local.MemoLinkEntity
 import app.ochre.notes.data.local.MemoTagEntity
 import app.ochre.notes.data.local.MemoWithMeta
+import app.ochre.notes.data.local.NotebookDao
+import app.ochre.notes.data.local.NotebookEntity
 import app.ochre.notes.data.local.OchreDatabase
 import app.ochre.notes.data.local.OutgoingLink
 import app.ochre.notes.data.local.ReminderDao
@@ -24,6 +26,7 @@ import app.ochre.notes.domain.FeedFilter
 import app.ochre.notes.domain.FeedOrder
 import app.ochre.notes.domain.MarkdownUtils
 import app.ochre.notes.domain.MemoUi
+import app.ochre.notes.domain.NotebookUi
 import app.ochre.notes.domain.OutgoingLinkUi
 import app.ochre.notes.domain.SearchQuery
 import app.ochre.notes.domain.TagUi
@@ -48,10 +51,16 @@ class NoteRepository(
     private val tagDao: TagDao = db.tagDao()
     private val linkDao: LinkDao = db.linkDao()
     private val reminderDao: ReminderDao = db.reminderDao()
+    private val notebookDao: NotebookDao = db.notebookDao()
 
     val tags: Flow<List<TagUi>> = nowTicker()
         .flatMapLatest { now -> tagDao.observeTagCounts(now) }
         .map { counts -> counts.map { TagUi(it.tagNorm, it.tagDisplay, it.count) } }
+        .distinctUntilChanged()
+
+    val notebooks: Flow<List<NotebookUi>> = nowTicker()
+        .flatMapLatest { now -> notebookDao.observeWithCounts(now) }
+        .map { counts -> counts.map { NotebookUi(it.uid, it.name, it.color, it.count) } }
         .distinctUntilChanged()
 
     fun observeFeed(
@@ -59,9 +68,10 @@ class NoteRepository(
         query: SearchQuery,
         limit: Int = 60,
         order: FeedOrder = FeedOrder.NEWEST,
+        notebookUid: String? = null,
     ): Flow<List<MemoUi>> =
         nowTicker()
-            .flatMapLatest { now -> memoDao.observeFeed(buildFeedQuery(filter, query, limit, now, order)) }
+            .flatMapLatest { now -> memoDao.observeFeed(buildFeedQuery(filter, query, limit, now, order, notebookUid)) }
             .map(::toUiList)
             .distinctUntilChanged()
 
@@ -104,7 +114,11 @@ class NoteRepository(
 
     suspend fun countAll(): Int = memoDao.countAll()
 
-    suspend fun createMemo(content: String, createdAt: Long = System.currentTimeMillis()): String =
+    suspend fun createMemo(
+        content: String,
+        createdAt: Long = System.currentTimeMillis(),
+        notebookUid: String? = null,
+    ): String =
         db.withTransaction {
             val uid = UUID.randomUUID().toString()
             val parsed = MarkdownUtils.parse(content)
@@ -115,6 +129,7 @@ class NoteRepository(
                 titleNorm = parsed.titleNorm,
                 createdAt = createdAt,
                 updatedAt = createdAt,
+                notebookUid = notebookUid,
             )
             memoDao.insert(memo)
             replaceTags(uid, parsed.tags.map { MemoTagEntity(uid, it.norm, it.display) })
@@ -131,6 +146,7 @@ class NoteRepository(
         content: String,
         staged: List<AttachmentEntity>,
         createdAt: Long = System.currentTimeMillis(),
+        notebookUid: String? = null,
     ): String = db.withTransaction {
         val uid = UUID.randomUUID().toString()
         val parsed = MarkdownUtils.parse(content)
@@ -142,6 +158,7 @@ class NoteRepository(
                 titleNorm = parsed.titleNorm,
                 createdAt = createdAt,
                 updatedAt = createdAt,
+                notebookUid = notebookUid,
             ),
         )
         replaceTags(uid, parsed.tags.map { MemoTagEntity(uid, it.norm, it.display) })
@@ -219,6 +236,8 @@ class NoteRepository(
                         titleNorm = parsed.titleNorm,
                         createdAt = now,
                         updatedAt = now,
+                        notebookUid = meta.memo.notebookUid,
+                        accentColor = meta.memo.accentColor,
                     ),
                 )
                 replaceTags(newUid, parsed.tags.map { MemoTagEntity(newUid, it.norm, it.display) })
@@ -370,6 +389,32 @@ class NoteRepository(
             originalName = "Sketch",
         )
 
+    suspend fun stageImage(file: File, draftUid: String, originalName: String = "Photo"): AttachmentEntity =
+        attachmentStore.importLocalFile(
+            source = file,
+            memoUid = draftUid,
+            kind = AttachmentKind.IMAGE,
+            mimeType = "image/jpeg",
+            originalName = originalName,
+        )
+
+    suspend fun attachImage(
+        memoUid: String,
+        file: File,
+        originalName: String = "Photo",
+    ): AttachmentEntity {
+        requireNotNull(memoDao.findByUid(memoUid)) { "Memo not found" }
+        val entity = attachmentStore.importLocalFile(
+            source = file,
+            memoUid = memoUid,
+            kind = AttachmentKind.IMAGE,
+            mimeType = "image/jpeg",
+            originalName = originalName,
+        )
+        attachmentDao.insert(entity)
+        return entity
+    }
+
     suspend fun attachSketch(memoUid: String, file: File): AttachmentEntity {
         requireNotNull(memoDao.findByUid(memoUid)) { "Memo not found" }
         val entity = attachmentStore.importLocalFile(
@@ -448,6 +493,37 @@ class NoteRepository(
         return createMemo("# $clean\n\n")
     }
 
+    suspend fun createNotebook(name: String, color: Int): String? {
+        val clean = name.trim().take(60)
+        if (clean.isBlank()) return null
+        val now = System.currentTimeMillis()
+        val uid = UUID.randomUUID().toString()
+        notebookDao.upsert(NotebookEntity(uid = uid, name = clean, color = color, createdAt = now, updatedAt = now))
+        return uid
+    }
+
+    suspend fun renameNotebook(uid: String, name: String) {
+        val clean = name.trim().take(60)
+        if (clean.isBlank()) return
+        notebookDao.rename(uid, clean, System.currentTimeMillis())
+    }
+
+    suspend fun deleteNotebook(uid: String) {
+        val now = System.currentTimeMillis()
+        db.withTransaction {
+            notebookDao.setDeleted(uid, now, now)
+            notebookDao.detachMemos(uid, now)
+        }
+    }
+
+    suspend fun setMemoNotebook(memoUid: String, notebookUid: String?) {
+        memoDao.setNotebook(memoUid, notebookUid, System.currentTimeMillis())
+    }
+
+    suspend fun setMemoAccent(memoUid: String, color: Int?) {
+        memoDao.setAccent(memoUid, color, System.currentTimeMillis())
+    }
+
     suspend fun createWelcomeNote(content: String) = createMemo(content)
 
     fun fileFor(entity: AttachmentEntity): File = attachmentStore.fileFor(entity)
@@ -475,6 +551,7 @@ class NoteRepository(
         limit: Int,
         now: Long,
         order: FeedOrder,
+        notebookUid: String?,
     ): SupportSQLiteQuery {
         val clauses = mutableListOf<String>()
         val args = mutableListOf<Any?>()
@@ -519,6 +596,10 @@ class NoteRepository(
         query.tags.forEach { tag ->
             clauses += "EXISTS (SELECT 1 FROM memo_tags t WHERE t.memoUid = m.uid AND t.tagNorm = ?)"
             args += tag
+        }
+        if (notebookUid != null) {
+            clauses += "m.notebookUid = ?"
+            args += notebookUid
         }
         val zone = ZoneId.systemDefault()
         query.afterMillis(zone)?.let { clauses += "m.createdAt >= ?".also { args += it } }

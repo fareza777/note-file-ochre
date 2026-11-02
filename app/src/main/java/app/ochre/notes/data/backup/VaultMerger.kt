@@ -6,6 +6,7 @@ import app.ochre.notes.data.local.LinkDao
 import app.ochre.notes.data.local.MemoEntity
 import app.ochre.notes.data.local.MemoLinkEntity
 import app.ochre.notes.data.local.MemoTagEntity
+import app.ochre.notes.data.local.NotebookEntity
 import app.ochre.notes.data.local.OchreDatabase
 import app.ochre.notes.data.local.ReminderEntity
 import app.ochre.notes.data.local.TagDao
@@ -28,6 +29,29 @@ class VaultMerger(
     private val db: OchreDatabase,
     private val attachmentStore: AttachmentStore,
 ) {
+
+    suspend fun mergeNotebooks(notebooks: List<BackupNotebook>): MergeCounts {
+        var imported = 0
+        var updated = 0
+        var skipped = 0
+        val dao = db.notebookDao()
+        notebooks.forEach { remote ->
+            val local = dao.findByUid(remote.uid)
+            when {
+                local == null -> {
+                    dao.upsert(remote.toEntity())
+                    if (remote.deletedAt != null) skipped++ else imported++
+                }
+                remote.updatedAt > local.updatedAt -> {
+                    dao.upsert(remote.toEntity())
+                    if (remote.deletedAt != null) dao.detachMemos(remote.uid, System.currentTimeMillis())
+                    updated++
+                }
+                else -> skipped++
+            }
+        }
+        return MergeCounts(imported, updated, skipped)
+    }
 
     suspend fun mergeMemos(memos: List<BackupMemo>): MergeCounts {
         var imported = 0
@@ -127,6 +151,8 @@ internal fun MemoEntity.toBackupMemo() = BackupMemo(
     openedAt = openedAt,
     echoLevel = echoLevel,
     echoedAt = echoedAt,
+    notebookUid = notebookUid,
+    accentColor = accentColor,
 )
 
 internal fun BackupMemo.toEntity(id: Long = 0) = MemoEntity(
@@ -144,6 +170,26 @@ internal fun BackupMemo.toEntity(id: Long = 0) = MemoEntity(
     openedAt = openedAt,
     echoLevel = echoLevel,
     echoedAt = echoedAt,
+    notebookUid = notebookUid,
+    accentColor = accentColor,
+)
+
+internal fun NotebookEntity.toBackupNotebook() = BackupNotebook(
+    uid = uid,
+    name = name,
+    color = color,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    deletedAt = deletedAt,
+)
+
+internal fun BackupNotebook.toEntity() = NotebookEntity(
+    uid = uid,
+    name = name,
+    color = color,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    deletedAt = deletedAt,
 )
 
 internal fun AttachmentEntity.toBackupAttachment() = BackupAttachment(

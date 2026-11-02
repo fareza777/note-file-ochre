@@ -110,6 +110,21 @@ Answer exactly as follows (the app is local-first and has no developer backend):
 - Ads: **No**.
 - Expected rating: Everyone / 3+.
 
+## Release notes (version 1.0.3)
+
+```
+This update helps you organise, capture and share your notes.
+
+Notes can now live in coloured notebooks: create one from the timeline, move a note from
+the editor, and tap a notebook to see only its notes. Each note can also carry its own
+accent colour. Three starter templates — daily note, task list and journal — are one tap
+away in a blank note, and the camera can add a photo straight from the Insert menu.
+Photos and files now sit in a tidy two-column gallery. Any note can be exported as a
+styled PDF and shared from the editor, and Markdown previews have a clearer hierarchy.
+
+Existing notes and settings carry over automatically.
+```
+
 ## Release notes (version 1.0.2)
 
 ```

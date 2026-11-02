@@ -16,19 +16,24 @@ Memos source code.
   launcher shortcuts (`New note`, `Search`, `Echo`) or share text from other apps.
 - **Timeline** — day-grouped cards, newest/oldest sorting, pinning, multi-select with bulk
   pin, archive, delete and tag, trash with restore, media and reminder filters, tag
-  browsing.
+  browsing, and colour-coded notebooks with per-note accent stripes.
 - **Markdown editor** — headings, bold/italic/strike, nested lists, checklists (tappable
   in preview), quotes, code, GFM tables, links, tags and `[[wiki links]]`; find & replace
-  with match highlighting, a heading outline for quick jumps, duplicate note, and
-  autosave with character/word feedback. The bottom bar is grouped into three labeled
-  menus (Format, Lists, Insert) instead of a wall of icons.
+  with match highlighting, a heading outline for quick jumps, duplicate note, one-tap
+  daily/task/journal templates, and autosave with character/word feedback. The bottom bar
+  is grouped into three labeled menus (Format, Lists, Insert) instead of a wall of icons.
+- **Notebooks** — group notes into named, coloured notebooks, move a note from the editor,
+  and filter the timeline to one notebook; deleting a notebook keeps its notes.
+- **PDF export** — turn any note into a styled A4 PDF, including its photos and tables,
+  and share it straight from the editor.
 - **Smart search** — full-text search over content and titles (SQLite FTS4) plus a small
   query language: `tag:studio`, `is:pinned`, `has:image`, `has:audio`,
   `before:2026-09-01`, `after:…`, `on:…`.
-- **Attachments** — photos and arbitrary files from the phone, voice memos recorded
-  in-app with a waveform preview, and finger sketches drawn on a full-screen pad
+- **Attachments** — photos from the gallery, the camera or the phone's files, voice memos
+  recorded in-app with a waveform preview, and finger sketches drawn on a full-screen pad
   (colors, three pen sizes, eraser, undo, clear) that save into the note as images.
-  A full-screen viewer offers pinch-zoom and share.
+  Images and files sit in a two-column gallery, and a full-screen viewer offers
+  pinch-zoom and share.
 - **Threads** — wiki links resolve to notes; every note shows *Links out* and
   *Mentioned in* backlinks.
 - **Echo** — gentle resurfacing of older notes so ideas do not sink.

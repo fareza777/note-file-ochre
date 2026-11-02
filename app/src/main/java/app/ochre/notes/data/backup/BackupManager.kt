@@ -32,6 +32,18 @@ data class BackupMemo(
     val openedAt: Long? = null,
     val echoLevel: Int = 0,
     val echoedAt: Long? = null,
+    val notebookUid: String? = null,
+    val accentColor: Int? = null,
+)
+
+@Serializable
+data class BackupNotebook(
+    val uid: String,
+    val name: String,
+    val color: Int,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val deletedAt: Long? = null,
 )
 
 @Serializable
@@ -67,6 +79,7 @@ data class BackupManifest(
     val memos: List<BackupMemo> = emptyList(),
     val attachments: List<BackupAttachment> = emptyList(),
     val reminders: List<BackupReminder> = emptyList(),
+    val notebooks: List<BackupNotebook> = emptyList(),
 )
 
 data class BackupSummary(
@@ -131,12 +144,15 @@ class BackupManager(
     suspend fun exportMarkdown(uri: Uri): BackupSummary = withContext(Dispatchers.IO) {
         val memos = db.memoDao().allMemos()
         val attachments = db.attachmentDao().allActive()
+        val notebookNames = db.notebookDao().all()
+            .filter { it.deletedAt == null }
+            .associate { it.uid to it.name }
         context.contentResolver.openOutputStream(uri, "wt")?.use { raw ->
             ZipOutputStream(raw.buffered()).use { zip ->
                 memos.filter { it.deletedAt == null }.forEach { memo ->
                     val name = "notes/${safeName(memo.title, memo.uid)}.md"
                     zip.putNextEntry(ZipEntry(name))
-                    zip.write(markdownFor(memo).toByteArray(Charsets.UTF_8))
+                    zip.write(markdownFor(memo, memo.notebookUid?.let { notebookNames[it] }).toByteArray(Charsets.UTF_8))
                     zip.closeEntry()
                 }
                 attachments.forEach { attachment ->
@@ -163,11 +179,13 @@ class BackupManager(
         val memos = db.memoDao().allMemos()
         val attachments = db.attachmentDao().allActive()
         val reminders = db.reminderDao().all()
+        val notebooks = db.notebookDao().all()
         val manifest = BackupManifest(
             createdAt = System.currentTimeMillis(),
             memos = memos.map { it.toBackupMemo() },
             attachments = attachments.map { it.toBackupAttachment() },
             reminders = reminders.map { it.toBackupReminder() },
+            notebooks = notebooks.map { it.toBackupNotebook() },
         )
         ZipOutputStream(FileOutputStream(destination).buffered()).use { zip ->
             zip.putNextEntry(ZipEntry("manifest.json"))
@@ -191,6 +209,7 @@ class BackupManager(
         }
         if (manifest.format != 1) throw IOException("Unsupported backup format")
 
+        val notebooks = merger.mergeNotebooks(manifest.notebooks)
         val memos = merger.mergeMemos(manifest.memos)
 
         var attachmentCount = 0
@@ -213,7 +232,7 @@ class BackupManager(
         )
     }
 
-    private fun markdownFor(memo: MemoEntity): String {
+    private fun markdownFor(memo: MemoEntity, notebookName: String?): String {
         val tags = MarkdownUtils.parse(memo.content).tags.joinToString(" ") { "#${it.display}" }
         val created = java.time.Instant.ofEpochMilli(memo.createdAt)
             .atZone(java.time.ZoneId.systemDefault())
@@ -222,6 +241,7 @@ class BackupManager(
             append("---\n")
             append("title: \"${memo.title.replace("\"", "\\\"")}\"\n")
             append("created: $created\n")
+            if (!notebookName.isNullOrBlank()) append("notebook: \"${notebookName.replace("\"", "\\\"")}\"\n")
             if (tags.isNotBlank()) append("tags: $tags\n")
             append("---\n\n")
             append(memo.content)

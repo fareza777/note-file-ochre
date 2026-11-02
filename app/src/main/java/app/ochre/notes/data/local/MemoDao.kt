@@ -33,7 +33,7 @@ abstract class MemoDao {
     abstract suspend fun withMetaByUids(uids: List<String>): List<MemoWithMeta>
 
     @Transaction
-    @RawQuery(observedEntities = [MemoEntity::class, MemoTagEntity::class, AttachmentEntity::class, ReminderEntity::class])
+    @RawQuery(observedEntities = [MemoEntity::class, MemoTagEntity::class, AttachmentEntity::class, ReminderEntity::class, NotebookEntity::class])
     abstract fun observeFeed(query: SupportSQLiteQuery): Flow<List<MemoWithMeta>>
 
     @Transaction
@@ -92,6 +92,12 @@ abstract class MemoDao {
 
     @Query("UPDATE memos SET openedAt = :now WHERE uid = :uid")
     abstract suspend fun markOpened(uid: String, now: Long)
+
+    @Query("UPDATE memos SET notebookUid = :notebookUid, updatedAt = :now WHERE uid = :uid")
+    abstract suspend fun setNotebook(uid: String, notebookUid: String?, now: Long)
+
+    @Query("UPDATE memos SET accentColor = :accentColor, updatedAt = :now WHERE uid = :uid")
+    abstract suspend fun setAccent(uid: String, accentColor: Int?, now: Long)
 
     @Query("UPDATE memos SET echoedAt = :now WHERE uid = :uid")
     abstract suspend fun markEchoed(uid: String, now: Long)
