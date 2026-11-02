@@ -1,5 +1,6 @@
 package app.ochre.notes.ui
 
+import android.app.Activity
 import android.net.Uri
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -41,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -50,6 +52,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import app.ochre.notes.ads.AdBannerBar
 import app.ochre.notes.ui.capsules.CapsulesScreen
 import app.ochre.notes.ui.echo.EchoScreen
 import app.ochre.notes.ui.editor.EditorScreen
@@ -83,10 +86,13 @@ fun OchreApp(
     onDraftOpened: () -> Unit = {},
     initialRoute: String? = null,
     onInitialRouteConsumed: () -> Unit = {},
+    adsFree: Boolean = false,
 ) {
     val navController = rememberNavController()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val adManager = LocalAppContainer.current.adManager
+    val activity = LocalContext.current as? Activity
     val backStackEntry by navController.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route.orEmpty()
     val showChrome = !route.startsWith(Routes.EDITOR)
@@ -123,10 +129,15 @@ fun OchreApp(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             if (showChrome) {
-                OchreBottomBar(
-                    currentRoute = route,
-                    onNavigate = { destination -> navController.navigateTopLevel(destination) },
-                )
+                Column {
+                    if (route == Routes.NOTES && !adsFree) {
+                        AdBannerBar()
+                    }
+                    OchreBottomBar(
+                        currentRoute = route,
+                        onNavigate = { destination -> navController.navigateTopLevel(destination) },
+                    )
+                }
             }
         },
         floatingActionButton = {
@@ -210,7 +221,10 @@ fun OchreApp(
                 val rawUid = entry.arguments?.getString("uid")
                 EditorScreen(
                     initialUid = rawUid?.takeUnless { it == "new" },
-                    onBack = { navController.popBackStack() },
+                    onBack = {
+                        navController.popBackStack()
+                        activity?.let { adManager.onEditorClosed(it, adsFree) }
+                    },
                     onOpenNote = { uid -> navController.navigate(Routes.editor(uid)) { launchSingleTop = true } },
                     onOpenTag = { tag -> navController.navigate(Routes.search(tag)) },
                     showMessage = showMessage,

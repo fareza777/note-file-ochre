@@ -22,4 +22,5 @@ data class UserSettings(
     val autoBackupTreeUri: String? = null,
     val lastBackupAt: Long? = null,
     val vaultPassphraseSet: Boolean = false,
+    val adFreeUntil: Long = 0L,
 )

@@ -77,6 +77,8 @@ class SettingsRepository(context: Context) {
 
     suspend fun setVaultPassphraseSet(set: Boolean) = update { it.copy(vaultPassphraseSet = set) }
 
+    suspend fun setAdFreeUntil(at: Long) = update { it.copy(adFreeUntil = at) }
+
     private fun Preferences.toSettings(): UserSettings = UserSettings(
         themeMode = runCatching { ThemeMode.valueOf(this[Keys.THEME] ?: ThemeMode.Light.name) }
             .getOrDefault(ThemeMode.Light),
@@ -101,6 +103,7 @@ class SettingsRepository(context: Context) {
         autoBackupTreeUri = this[Keys.AUTO_BACKUP_URI],
         lastBackupAt = this[Keys.LAST_BACKUP_AT],
         vaultPassphraseSet = this[Keys.VAULT_PASSPHRASE] ?: false,
+        adFreeUntil = this[Keys.AD_FREE_UNTIL] ?: 0L,
     )
 
     private fun MutablePreferences.write(settings: UserSettings) {
@@ -123,6 +126,7 @@ class SettingsRepository(context: Context) {
         settings.autoBackupTreeUri?.let { this[Keys.AUTO_BACKUP_URI] = it } ?: remove(Keys.AUTO_BACKUP_URI)
         settings.lastBackupAt?.let { this[Keys.LAST_BACKUP_AT] = it } ?: remove(Keys.LAST_BACKUP_AT)
         this[Keys.VAULT_PASSPHRASE] = settings.vaultPassphraseSet
+        this[Keys.AD_FREE_UNTIL] = settings.adFreeUntil
     }
 
     private object Keys {
@@ -145,6 +149,7 @@ class SettingsRepository(context: Context) {
         val AUTO_BACKUP_URI = stringPreferencesKey("auto_backup_tree_uri")
         val LAST_BACKUP_AT = longPreferencesKey("last_backup_at")
         val VAULT_PASSPHRASE = booleanPreferencesKey("vault_passphrase_set")
+        val AD_FREE_UNTIL = longPreferencesKey("ad_free_until")
     }
 
     private companion object {

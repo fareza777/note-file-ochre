@@ -1,5 +1,6 @@
 package app.ochre.notes.ui.settings
 
+import android.app.Activity
 import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -38,6 +39,7 @@ import androidx.compose.material.icons.outlined.Fingerprint
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.LockClock
+import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SettingsBrightness
@@ -75,6 +77,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.ochre.notes.BuildConfig
+import app.ochre.notes.ads.AdConfig
 import app.ochre.notes.data.backup.BackupManager
 import app.ochre.notes.data.backup.VaultCrypto
 import app.ochre.notes.data.security.SecretStore
@@ -84,6 +87,7 @@ import app.ochre.notes.data.sync.SyncWorker
 import app.ochre.notes.domain.ThemeMode
 import app.ochre.notes.domain.UserSettings
 import app.ochre.notes.notifications.ReminderScheduler
+import app.ochre.notes.ui.LocalAppContainer
 import app.ochre.notes.ui.components.SparkMark
 import app.ochre.notes.ui.ochreViewModel
 import app.ochre.notes.ui.util.Formatting
@@ -128,6 +132,11 @@ private class SettingsViewModel(
     fun setLockTimeout(millis: Long) = viewModelScope.launch { repository.setLockTimeout(millis) }
 
     fun setHideRecentPreview(hidden: Boolean) = viewModelScope.launch { repository.setHideRecentPreview(hidden) }
+
+    fun grantAdFree() = viewModelScope.launch {
+        val base = maxOf(System.currentTimeMillis(), settings.value.adFreeUntil)
+        repository.setAdFreeUntil(base + AdConfig.AD_FREE_MILLIS)
+    }
 
     fun createBackup(uri: Uri, passphrase: String) = runTask("Encrypting your vault…") {
         val summary = backupManager.exportEncrypted(uri, passphrase.toCharArray())
@@ -227,6 +236,10 @@ fun SettingsScreen(
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val adManager = LocalAppContainer.current.adManager
+    val rewardedReady by adManager.rewardedReady.collectAsStateWithLifecycle()
+    val activity = context as? Activity
+    val adFree = settings.adFreeUntil > System.currentTimeMillis()
     var showCredits by remember { mutableStateOf(false) }
     var showPrivacy by remember { mutableStateOf(false) }
     var vaultDialog by remember { mutableStateOf<VaultDialog?>(null) }
@@ -235,6 +248,7 @@ fun SettingsScreen(
     val stamp = remember { SimpleDateFormat("yyyyMMdd", Locale.US).format(Date()) }
 
     LaunchedEffect(Unit) { viewModel.events.collect { showMessage(it) } }
+    LaunchedEffect(Unit) { adManager.loadRewarded() }
 
     val createBackupLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream"),
@@ -479,14 +493,66 @@ fun SettingsScreen(
             }
         }
 
+        item { SectionTitle("SUPPORT", Modifier.padding(top = 14.dp)) }
+        item {
+            SettingsCard {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Outlined.PlayCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(22.dp),
+                    )
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            if (adFree) "Ad-free until ${Formatting.dateTime(settings.adFreeUntil)}" else "Support Ochre",
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        Text(
+                            if (adFree) {
+                                "Thank you for watching. Banners are hidden until then."
+                            } else {
+                                "Watch a short ad to hide banners for 24 hours"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (!adFree) {
+                        TextButton(
+                            onClick = {
+                                val host = activity
+                                if (host == null || !rewardedReady) {
+                                    adManager.loadRewarded()
+                                    showMessage("The ad is still loading. Try again in a moment.")
+                                } else {
+                                    adManager.showRewarded(
+                                        activity = host,
+                                        onEarned = {
+                                            viewModel.grantAdFree()
+                                            showMessage("Thank you — no banners for 24 hours")
+                                        },
+                                        onUnavailable = { showMessage("The ad is not ready. Try again in a moment.") },
+                                    )
+                                }
+                            },
+                        ) {
+                            Text("Watch ad")
+                        }
+                    }
+                }
+            }
+        }
+
         item { SectionTitle("PRIVACY", Modifier.padding(top = 14.dp)) }
         item {
             SettingsCard(contentPadding = 6.dp) {
-                SettingsRow(Icons.Outlined.Shield, "Privacy", "Local-first, no account, no tracking") { showPrivacy = true }
+                SettingsRow(Icons.Outlined.Shield, "Privacy", "Local-first, no account") { showPrivacy = true }
             }
             Spacer(Modifier.height(10.dp))
             Text(
-                "Ochre stores your notes on this device. Nothing is uploaded unless you explicitly set up sync or backup.",
+                "Your notes are never uploaded unless you explicitly set up sync or backup. Ad requests never include note content.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 6.dp),
@@ -542,9 +608,9 @@ fun SettingsScreen(
             title = { Text("Your notes stay yours") },
             text = {
                 Text(
-                    "Ochre works completely offline. There is no account, no analytics and no advertising.\n\n" +
-                        "Notes, photos and voice memories live in the app's private storage. Optional backup and sync are end-to-end encrypted and only run when you turn them on.\n\n" +
-                        "Biometric data never leaves your device's secure hardware.",
+                    "Ochre keeps your notes on this device. There is no account, and your writing is never sent to advertisers.\n\n" +
+                        "The free version shows ads from Google AdMob, which may use a device identifier to select and measure ads. You can watch a rewarded ad to hide banners for 24 hours.\n\n" +
+                        "Optional backup and sync are end-to-end encrypted and only run when you turn them on. Biometric data never leaves your device's secure hardware.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             },

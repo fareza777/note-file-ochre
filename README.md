@@ -3,8 +3,8 @@
 **A quieter place for your thoughts.**
 
 Ochre is a local-first Markdown notebook for Android. Notes stay on the device, open in
-milliseconds, and remain readable as plain files you own. No account, no analytics, and no
-network calls unless you enable optional sync.
+milliseconds, and remain readable as plain files you own. No account and no feed; the
+network is used only for optional sync and the small ads that keep Ochre free.
 
 The product and data model are inspired by [usememos/memos](https://github.com/usememos/memos)
 (MIT). Ochre is an independent Kotlin/Jetpack Compose implementation; it does not bundle
@@ -136,9 +136,11 @@ upload key itself must be recoverable).
 
 ## Privacy
 
-Ochre does not collect, transmit or sell any data. There is no analytics, crash reporting
-or advertising SDK. See [PRIVACY.md](PRIVACY.md) for the full policy and the permission
-list.
+Your notes, attachments and settings stay on the device unless you turn on encrypted sync
+or export them. Ochre shows ads through Google AdMob (Google's test ad units in this
+build), which may collect a device identifier to serve and measure them; note content is
+never sent to the ad SDK. Watching an optional rewarded ad hides banners for 24 hours.
+See [PRIVACY.md](PRIVACY.md) for the full policy and the permission list.
 
 ## License and attribution
 

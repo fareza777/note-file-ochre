@@ -70,6 +70,7 @@ class MainActivity : FragmentActivity() {
                                 onDraftOpened = { draftRequested = false },
                                 initialRoute = deepLinkRoute,
                                 onInitialRouteConsumed = { deepLinkRoute = null },
+                                adsFree = settings.adFreeUntil > System.currentTimeMillis(),
                             )
                         }
                     }

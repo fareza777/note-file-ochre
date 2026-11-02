@@ -13,7 +13,7 @@ Everything needed to publish the first release. Fill the two bracketed fields
 | Tags | notes, markdown, offline, journal, privacy |
 | Default language | English (US) |
 | Content rating | Everyone |
-| Ads | No |
+| Ads | Yes — Google AdMob (test units in this build) |
 | In-app purchases | No |
 | Price | Decide at publish time; the APK contains no billing code |
 
@@ -53,8 +53,8 @@ KEEP IT YOURS
 • Markdown export: a zip of .md files with front matter
 • Optional end-to-end encrypted WebDAV sync to a server you choose
 • App lock with biometrics or your device PIN
-• No analytics, no tracking, no advertising SDKs
-• 100% offline by default — the internet permission is only used if you enable sync
+• Small banner ads keep Ochre free, and a rewarded ad hides banners for 24 hours
+• Your notes stay on-device; only ads and optional sync use the network
 
 DESIGNED TO FEEL CALM
 • Material 3 with a warm ochre palette, Fraunces and Inter typography
@@ -62,7 +62,8 @@ DESIGNED TO FEEL CALM
 • Considered motion, edge-to-edge layout and comfortable reading measure
 
 Ochre is built for the moment between two things — a thought, a sketch, a line you do
-not want to lose. It opens fast, stays out of the way, and never phones home.
+not want to lose. It opens fast, stays out of the way, and your writing only leaves the
+phone when you ask it to.
 ```
 
 ## Graphics
@@ -84,17 +85,22 @@ Screenshot order and captions for the listing:
 
 ## Data safety form
 
-Answer exactly as follows (the app is local-first and has no developer backend):
+The app itself has no developer backend and never sends note content. Google AdMob is used
+for advertising; answer the form from Google's current AdMob data-safety guidance:
 
-- Does your app collect or share any of the required user data types? **No.**
-- Is all of the user data collected by your app encrypted in transit? *Not applicable*
-  (no data leaves the device unless the user configures their own WebDAV server; that
-  transfer is end-to-end encrypted by the app).
-- Do you provide a way for users to request that their data is deleted? **Not applicable**
-  — data never leaves the device; uninstalling removes it. Backups are user-controlled.
-- Data types: none selected.
-- Security practices: data is encrypted at rest in backups (AES-256-GCM); users can
-  export and delete all data at any time from Settings → Data.
+- Does your app collect or share any of the required user data types? **Yes**, through the
+  AdMob SDK.
+- Device or other IDs: collected and shared for advertising, marketing and measurement.
+- Approximate location: collected and shared for advertising (derived from IP address).
+- App activity (app interactions): collected and shared for advertising and measurement.
+- Note content, photos, voice memos, tags and search history are never collected or shared
+  by Ochre.
+- Is all data encrypted in transit? **Yes** — ads use HTTPS and WebDAV sync is encrypted by
+  the app before upload.
+- Data deletion: users delete notes in the app or uninstall it; the advertising ID can be
+  reset or deleted in Android Settings.
+- Data collection is not required to use the app, but ads are shown unless a rewarded ad
+  grants 24 hours without banners.
 
 ## App access
 
@@ -107,8 +113,19 @@ Answer exactly as follows (the app is local-first and has no developer backend):
 - Violence, sexuality, language, controlled substances: **No** for all.
 - User-generated content sharing: **No** — notes never leave the device except to storage
   locations the user picks, and there is no social surface.
-- Ads: **No**.
+- Ads: **Yes**.
 - Expected rating: Everyone / 3+.
+
+## Release notes (version 1.0.4)
+
+```
+Ochre is now supported by ads.
+
+A small banner sits above the tab bar on the timeline, clear of the system navigation
+buttons, and an interstitial may appear after closing several notes. In Settings you can
+watch a rewarded ad to hide banners for 24 hours. Notes, photos and voice memos are never
+shared with the ad SDK. This build uses Google's test ad units.
+```
 
 ## Release notes (version 1.0.3)
 
@@ -145,7 +162,10 @@ labeled menus — Format, Lists and Insert — so every tool is easy to find.
 3. Paste the short/full description, upload the icon, feature graphic and screenshots.
 4. Complete Data safety exactly as above, content rating, and target audience.
 5. Add `[PRIVACY URL]` (host `PRIVACY.md`) and `[SUPPORT EMAIL]`; both are mandatory.
-6. Run an internal testing track with a signed AAB, verify install from Play on a clean
+6. Before production, replace the test banner/interstitial/rewarded unit IDs in
+   `AdConfig.kt` and the test App ID in `AndroidManifest.xml` with live AdMob IDs, and add
+   the Google UMP consent flow for EEA/UK users.
+7. Run an internal testing track with a signed AAB, verify install from Play on a clean
    device, then promote to production.
 
 ## Pre-publish verification
@@ -156,4 +176,4 @@ labeled menus — Format, Lists and Insert — so every tool is easy to find.
 - `apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk` — shows
   `CN=Ochre Notes`
 - Fresh install: onboarding, create/edit note, reminder fires, backup/restore, biometric
-  lock, widget and tile all work offline (airplane mode).
+  lock, widget and tile all work offline (airplane mode); ads simply do not appear.

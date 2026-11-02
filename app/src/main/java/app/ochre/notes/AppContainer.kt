@@ -1,6 +1,7 @@
 package app.ochre.notes
 
 import android.content.Context
+import app.ochre.notes.ads.AdManager
 import app.ochre.notes.data.NoteRepository
 import app.ochre.notes.data.backup.BackupManager
 import app.ochre.notes.data.local.OchreDatabase
@@ -31,6 +32,8 @@ class DraftInbox {
 class AppContainer(context: Context) {
 
     val appContext: Context = context.applicationContext
+
+    val adManager = AdManager(appContext)
 
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 

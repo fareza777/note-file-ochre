@@ -46,7 +46,7 @@ private val pages = listOf(
         label = "OCHRE",
         title = "A quieter place\nfor your thoughts.",
         body = "Ochre is a notebook without noise. No feeds, no followers, no account — just your words on warm paper.",
-        footnote = "Local-first · No tracking",
+        footnote = "Local-first · No account",
     ),
     OnboardingPage(
         label = "WRITE FREELY",
